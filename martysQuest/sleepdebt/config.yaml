@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sleep-debt monitor configuration.
+#
+# Nothing in this system is hardcoded; every number below is read at runtime.
+# The dead-man's switch is deliberately NOT here — see deadman.yaml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+oura:
+  # Credentials come from the environment, never from this file.
+  #   OURA_CLIENT_ID, OURA_CLIENT_SECRET, OURA_REFRESH_TOKEN
+  base_url: "https://api.ouraring.com/v2"
+  token_url: "https://api.ouraring.com/oauth/token"
+  # Must be registered EXACTLY on your app in the Oura developer console.
+  # Used only by `python -m sleepdebt.authorize`, the one-time flow that mints
+  # the refresh token.
+  redirect_uri: "http://localhost:8731/callback"
+  # If authorisation fails with invalid_scope, check which scopes are enabled
+  # on the app and match them here.
+  scope: "daily personal"
+  # Oura serves roughly two years of history.
+  backfill_days: 730
+  timeout_seconds: 30
+
+debt:
+  # Hours of sleep per night treated as break-even.
+  # PLACEHOLDER until calibration runs — see README, "Calibration".
+  baseline_need_hours: 6.5
+
+  # Trailing window the debt is summed over.
+  window_days: 14
+
+  # Surplus nights offset debt. A 12 h night credits 12 - baseline_need.
+  # null = uncapped, which is the intended behaviour.
+  surplus_credit_cap_hours: null
+
+  # Days with no data are excluded from the window entirely — never imputed.
+  # Below this many observed days the window is too sparse to alert on, so
+  # debt alerting is suppressed. This does NOT suppress the dead-man's switch,
+  # which is the check that actually catches missing data.
+  min_observed_days: 7
+
+  # Which Oura session types count toward a night's total.
+  # Oura emits at least: long_sleep, sleep, late_nap, rest.
+  # Naps genuinely reduce sleep pressure, so they are included by default.
+  # Matching is case-insensitive; "nap" also matches "late_nap".
+  count_session_types: ["long_sleep", "sleep", "nap", "late_nap"]
+
+alerting:
+  # Debt tiers, in hours. Each is a separate warning level. Crossing UP into a
+  # higher tier always alerts, even inside a cooldown — escalation must get
+  # through. Re-alerting at the same tier waits for the cooldown.
+  # At a 6.5 h baseline over a 14-day window these correspond to average
+  # nights of 5.43 h, 4.71 h and 4.00 h — roughly 43 minutes apart, so the
+  # ladder actually discriminates across the range being recovered through.
+  tiers:
+    - hours: 15.0
+      label: "building"
+    - hours: 25.0
+      label: "high"
+    - hours: 35.0
+      label: "severe"
+
+  # Debt must sit at or above the lowest tier this many days running before
+  # anything fires. Suppresses single-night noise.
+  consecutive_days: 2
+
+  # Once debt drops back below the lowest tier the ladder resets, so a later
+  # climb warns again from the bottom.
+
+  # Quiet period before re-alerting at the SAME tier. Escalation ignores it.
+  cooldown_days: 3
+
+  rhr:
+    # Resting heart rate is no longer a trigger — the tiers are the trigger.
+    # When "ON", an elevation over the trailing baseline is added to the tier-1
+    # message as corroborating detail. "OFF" omits it.
+    mode: "ON"
+    delta_bpm: 5
+    baseline_days: 30
+
+recipients:
+  # Tier 1 gets numbers. Tier 2 gets plain language and no clinical framing.
+  tier1:
+    - name: "Justin"
+      sms: "+1XXXXXXXXXX"
+  tier2: []
+    # - name: "Kate"
+    #   sms: "+1XXXXXXXXXX"
+
+notifier:
+  # "twilio" | "console"  — console prints instead of sending, for dry runs.
+  backend: "console"
+  twilio:
+    # Credentials from the environment:
+    #   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+    from_number: "+1XXXXXXXXXX"
+
+storage:
+  # Alert history and last-seen data date. Must persist between runs.
+  state_path: "./state.json"
