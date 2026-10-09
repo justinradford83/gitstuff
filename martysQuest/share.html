@@ -286,6 +286,29 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .sleepcard .stale{font-size:11.5px;color:var(--ink-3);margin:13px 0 0;padding-top:11px;
   border-top:1px solid var(--line-soft);line-height:1.45}
 .sleepcard .stale b{font-weight:600;color:var(--ink-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* ── THE EVENING NUDGE ──
+   The app cannot push — it is a sandboxed page with no service worker — so
+   this is the half that works without one: whenever he opens the app after
+   seven with the day still unlogged, the ask is the first thing on screen.
+   It disappears the moment the mood is logged; there is no dismiss, because
+   dismissing it is what logging it does. */
+.nudge{display:flex;width:100%;gap:12px;align-items:center;text-align:left;cursor:pointer;
+  background:linear-gradient(135deg,var(--surface-2),var(--surface) 72%);
+  border:1px solid var(--d-purple);border-radius:var(--r-lg);padding:15px 16px;
+  margin:0 0 18px;color:inherit;font:inherit;box-shadow:var(--shadow);
+  animation:nudge-in .36s cubic-bezier(.2,1.2,.4,1) both}
+.nudge[hidden]{display:none}
+.nudge .ne{font-size:30px;line-height:1;font-family:var(--emoji);flex:0 0 auto}
+.nudge .nt{flex:1;min-width:0}
+.nudge .nt b{display:block;font-family:var(--serif);font-size:17px;font-weight:600;
+  margin-bottom:3px;line-height:1.25}
+.nudge .nt span{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.4}
+.nudge .ngo{flex:0 0 auto;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--d-purple);border:1px solid var(--d-purple);
+  border-radius:999px;padding:5px 10px}
+@keyframes nudge-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.nudge{animation:none}}
+
 /* ── MOOD PICKER ──
    A 3x3 of tiles reading worst at the top-left to most elevated at the
    bottom-right, so the order is spatial as well as numeric. Radio semantics

@@ -286,6 +286,29 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .sleepcard .stale{font-size:11.5px;color:var(--ink-3);margin:13px 0 0;padding-top:11px;
   border-top:1px solid var(--line-soft);line-height:1.45}
 .sleepcard .stale b{font-weight:600;color:var(--ink-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* ── THE EVENING NUDGE ──
+   The app cannot push — it is a sandboxed page with no service worker — so
+   this is the half that works without one: whenever he opens the app after
+   seven with the day still unlogged, the ask is the first thing on screen.
+   It disappears the moment the mood is logged; there is no dismiss, because
+   dismissing it is what logging it does. */
+.nudge{display:flex;width:100%;gap:12px;align-items:center;text-align:left;cursor:pointer;
+  background:linear-gradient(135deg,var(--surface-2),var(--surface) 72%);
+  border:1px solid var(--d-purple);border-radius:var(--r-lg);padding:15px 16px;
+  margin:0 0 18px;color:inherit;font:inherit;box-shadow:var(--shadow);
+  animation:nudge-in .36s cubic-bezier(.2,1.2,.4,1) both}
+.nudge[hidden]{display:none}
+.nudge .ne{font-size:30px;line-height:1;font-family:var(--emoji);flex:0 0 auto}
+.nudge .nt{flex:1;min-width:0}
+.nudge .nt b{display:block;font-family:var(--serif);font-size:17px;font-weight:600;
+  margin-bottom:3px;line-height:1.25}
+.nudge .nt span{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.4}
+.nudge .ngo{flex:0 0 auto;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--d-purple);border:1px solid var(--d-purple);
+  border-radius:999px;padding:5px 10px}
+@keyframes nudge-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.nudge{animation:none}}
+
 /* ── MOOD PICKER ──
    A 3x3 of tiles reading worst at the top-left to most elevated at the
    bottom-right, so the order is spatial as well as numeric. Radio semantics
@@ -602,6 +625,7 @@ nav.tabs button.on{color:var(--accent);border-top-color:var(--accent)}
 
   <!-- ══ 1. CAPTURE ══ -->
   <section class="screen on" id="s-log">
+    <button class="nudge" id="moodNudge" hidden></button>
     <p class="eyebrow">Capture</p>
     <h2 class="sec">What did you just take?</h2>
     <p class="sub">Tap a tile to log it. Time defaults to now. A dot in a tile's corner means logging that one
@@ -1464,6 +1488,29 @@ function openEntry(c){
     celebrateIfStar(e.date);
   };
 }
+/* ── THE EVENING NUDGE ──
+   After `MOOD_NUDGE_HOUR` local, with today's mood still missing, the capture
+   screen leads with the ask. Re-checked on a timer as well as on every render,
+   so an app left open across seven o'clock still picks it up. */
+const MOOD_NUDGE_HOUR = 19;
+function moodDue(){
+  const iso = todayISO(), d = state.daily[iso];
+  if(d && d.mood9 != null) return false;
+  return new Date().getHours() >= MOOD_NUDGE_HOUR;
+}
+function renderNudge(){
+  const el = document.getElementById("moodNudge");
+  if(!el) return;
+  const due = moodDue();
+  el.hidden = !due;
+  if(!due) return;
+  el.innerHTML = '<span class="ne">🎭</span>'+
+    '<span class="nt"><b>How are you feeling today?</b>'+
+    '<span>Complete your daily check-in — it takes one tap and earns the SPIRITUAL dot.</span></span>'+
+    '<span class="ngo">Log it</span>';
+  el.onclick = openMood;
+}
+
 /* ── THE MOOD CHECK ──
    One mood per day. Re-running it replaces the day rather than stacking a
    second row, so the chart stays one point per day and the ledger does not
@@ -2593,7 +2640,10 @@ function renderHeader(){
   const total=daysBetween(INJURY,GOAL), gone=Math.max(0,Math.min(total,daysBetween(INJURY,iso)));
   document.getElementById("railFill").style.width=(gone/total*100)+"%";
 }
-function renderAll(){ renderHeader(); renderBoard(); renderLedger(); renderDash(); renderPlan(); }
+function renderAll(){ renderHeader(); renderBoard(); renderLedger(); renderDash(); renderPlan();
+  renderNudge(); }
+/* The hour can roll over while the app simply sits open. */
+setInterval(renderNudge, 60000);
 
 document.querySelectorAll("nav.tabs button").forEach(b=> b.onclick=()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.remove("on"));
