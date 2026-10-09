@@ -363,8 +363,7 @@ section.folded{margin-bottom:4px}
 .jumpbar button i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
 .jumpbar button.on{color:var(--ink);border-color:var(--ink-3);background:var(--surface-2)}
 /* the heading a jump lands on must clear both sticky bars */
-#catalogGroups .eyebrow{scroll-margin-top:calc(var(--hdr,56px) + 54px)}
-#catalogGroups{padding-bottom:62vh}
+/* The tail is measured at render time, not guessed — see fitTail(). */
 
 /* ── MOOD PICKER ──
    A 3x3 of tiles reading worst at the top-left to most elevated at the

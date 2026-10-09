@@ -363,8 +363,7 @@ section.folded{margin-bottom:4px}
 .jumpbar button i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
 .jumpbar button.on{color:var(--ink);border-color:var(--ink-3);background:var(--surface-2)}
 /* the heading a jump lands on must clear both sticky bars */
-#catalogGroups .eyebrow{scroll-margin-top:calc(var(--hdr,56px) + 54px)}
-#catalogGroups{padding-bottom:62vh}
+/* The tail is measured at render time, not guessed — see fitTail(). */
 
 /* ── MOOD PICKER ──
    A 3x3 of tiles reading worst at the top-left to most elevated at the
@@ -1076,6 +1075,13 @@ function migrate(o){
   o.settings.debtWindow  ??= 14;
   o.settings.moodRange   ??= 30;
   o.settings.folded      ??= {};
+  /* Everything starts folded: the capture screen opens on the most-logged row
+     and nine headings rather than forty-two tiles. One-time, so a section
+     opened by hand stays open from then on. */
+  if(!o.settings.foldInit){
+    GROUPS.forEach(g=>{ o.settings.folded[g.id] = true; });
+    o.settings.foldInit = true;
+  }
   if(!o.settings.quetMg){
     o.entries.forEach(e=>{ const mg=QUET_MG[e.id]; if(mg) e.q = Math.round(e.q*mg); });
     o.settings.quetMg = true;
@@ -1410,6 +1416,35 @@ function renderFrequent(){
   row.querySelectorAll("[data-freq]").forEach(b=>
     b.onclick=()=>openEntry(BY_ID[b.dataset.freq]));
 }
+/* ── TAIL ROOM ──
+   To scroll the last section up under the bar the page needs that much
+   scrollable room beneath it. A blanket 62vh was both too much (dead space
+   under a long list) and unreliable (not enough under a short one), so it is
+   measured: exactly the shortfall, and zero when the list is already long
+   enough. Runs after every catalog render, because folding changes heights. */
+function chromeHeight(){
+  const hdr = document.querySelector("header"), bar = document.getElementById("jumpbar");
+  return (hdr ? hdr.offsetHeight : 0) + (bar ? bar.offsetHeight : 0);
+}
+function fitTail(){
+  const host = document.getElementById("catalogGroups");
+  const last = host && host.lastElementChild;
+  /* The run-out goes on the screen, below the disclaimer, not on the list.
+     On the list it opened a hole between the last tiles and the footer; below
+     everything it just reads as the end of the page. */
+  const pad = document.getElementById("s-log");
+  if(!host || !pad) return;
+  pad.style.paddingBottom = "0px";
+  if(!last) return;
+  const below = document.documentElement.scrollHeight -
+                (last.getBoundingClientRect().top + window.scrollY);
+  const want  = window.innerHeight - chromeHeight();
+  /* Not capped. Capping it makes the page shorter than the jumps need and
+     breaks them all, not just the last one — the tail is exactly the shortfall
+     and nothing more, and it is zero whenever the list is already long enough. */
+  pad.style.paddingBottom = Math.max(0, Math.ceil(want - below)) + "px";
+}
+addEventListener("resize", fitTail);
 /* ── SECTION JUMP BAR ──
    One chip per section that actually has tiles, so retiring an item can empty
    a section out of both the list and the bar at once. */
@@ -1425,8 +1460,14 @@ function renderJumpbar(){
     /* Landing on a folded section would read as a broken jump, so open it
        first; renderCatalog rebuilds the DOM, so re-find the heading after. */
     const rebuilt = foldSection(id, true);
-    const go = () => { const h = document.getElementById("grp-"+id);
-      if(h) h.scrollIntoView({behavior:"smooth", block:"start"}); };
+    /* scrollIntoView lands against a sticky bar inconsistently, so the offset
+       is computed from the two bars' real heights and scrolled to directly. */
+    const go = () => {
+      const h = document.getElementById("grp-"+id);
+      if(!h) return;
+      const y = h.getBoundingClientRect().top + window.scrollY - chromeHeight() - 6;
+      window.scrollTo({top: Math.max(0, Math.round(y)), behavior: "smooth"});
+    };
     if(rebuilt) requestAnimationFrame(go); else go();
   });
   spyJumpbar(live);
@@ -1500,6 +1541,7 @@ function renderCatalog(){
   host.querySelectorAll("[data-fold]").forEach(b=> b.onclick=()=>foldSection(b.dataset.fold));
   renderFrequent();
   renderJumpbar();
+  fitTail();
 }
 function openEntry(c){
   if(c.checkin) return openCheckin();
