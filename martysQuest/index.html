@@ -330,20 +330,9 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .freqchip i.strip{position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:3px;height:56%;border-radius:0 2px 2px 0}
 
-/* ── COLLAPSIBLE SECTIONS ──
-   Folded state is remembered. A jump from the bar always unfolds its target
-   first — arriving at a closed section would make the jump look broken. */
-.eyebrow.ghead{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
-  cursor:pointer;font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0}
-.eyebrow.ghead::after{content:"";flex:1;height:1px;background:var(--line-soft)}
-.eyebrow.ghead .gchev{flex:0 0 auto;font-size:9px;transition:transform .18s ease;
-  display:inline-block;color:var(--ink-3)}
-.eyebrow.ghead[aria-expanded="false"] .gchev{transform:rotate(-90deg)}
-.eyebrow.ghead .gcount{flex:0 0 auto;font-size:9px;color:var(--ink-3);opacity:.75}
-section.folded .grid,section.folded .gnote{display:none}
-section.folded{margin-bottom:4px}
-@media (prefers-reduced-motion:reduce){.eyebrow.ghead .gchev{transition:none}}
+/* Section headings carry their item count. They do not fold: a heading that
+   moves under you is a heading you cannot aim a jump at. */
+.eyebrow .gcount{font-size:9px;color:var(--ink-3);opacity:.75;margin-left:2px}
 
 /* ── SECTION JUMP BAR ──
    Sticks under the header so it is reachable wherever you are in the list.
@@ -1074,14 +1063,9 @@ function migrate(o){
   o.settings.baselineNeed ??= 6.5;   /* keep in step with sleepdebt/config.yaml */
   o.settings.debtWindow  ??= 14;
   o.settings.moodRange   ??= 30;
-  o.settings.folded      ??= {};
-  /* Everything starts folded: the capture screen opens on the most-logged row
-     and nine headings rather than forty-two tiles. One-time, so a section
-     opened by hand stays open from then on. */
-  if(!o.settings.foldInit){
-    GROUPS.forEach(g=>{ o.settings.folded[g.id] = true; });
-    o.settings.foldInit = true;
-  }
+  /* Sections used to fold. They no longer do, so anything left folded would
+     be permanently invisible — clear the stored state rather than orphan it. */
+  delete o.settings.folded; delete o.settings.foldInit;
   if(!o.settings.quetMg){
     o.entries.forEach(e=>{ const mg=QUET_MG[e.id]; if(mg) e.q = Math.round(e.q*mg); });
     o.settings.quetMg = true;
@@ -1422,9 +1406,27 @@ function renderFrequent(){
    under a long list) and unreliable (not enough under a short one), so it is
    measured: exactly the shortfall, and zero when the list is already long
    enough. Runs after every catalog render, because folding changes heights. */
+/* Height of everything pinned to the top: the header, plus the jump bar that
+   sticks beneath it. A jump target has to clear both. Measured live rather
+   than assumed — the header wraps to two lines on a narrow screen. */
 function chromeHeight(){
   const hdr = document.querySelector("header"), bar = document.getElementById("jumpbar");
   return (hdr ? hdr.offsetHeight : 0) + (bar ? bar.offsetHeight : 0);
+}
+/* Scroll a section's heading to sit just below the jump bar.
+
+   Done by arithmetic on the document position rather than scrollIntoView:
+   scrollIntoView has no idea the bar is there, and `scroll-margin-top` has to
+   be a fixed CSS length while the chrome height is not. The page may be too
+   short to reach the target, in which case the browser clamps and the section
+   lands as high as it can — fitTail() is what keeps that from happening for
+   the last section. */
+const JUMP_GAP = 4;
+function jumpToSection(id){
+  const h = document.getElementById("grp-"+id);
+  if(!h) return;
+  const y = h.getBoundingClientRect().top + window.scrollY - chromeHeight() - JUMP_GAP;
+  window.scrollTo({top: Math.max(0, Math.round(y)), behavior: "smooth"});
 }
 function fitTail(){
   const host = document.getElementById("catalogGroups");
@@ -1455,21 +1457,8 @@ function renderJumpbar(){
   bar.innerHTML = live.map(g=>
     '<button data-jump="'+g.id+'"><i style="background:'+g.color+'"></i>'+
     esc(g.short||g.label)+'</button>').join("");
-  bar.querySelectorAll("[data-jump]").forEach(b=> b.onclick=()=>{
-    const id = b.dataset.jump;
-    /* Landing on a folded section would read as a broken jump, so open it
-       first; renderCatalog rebuilds the DOM, so re-find the heading after. */
-    const rebuilt = foldSection(id, true);
-    /* scrollIntoView lands against a sticky bar inconsistently, so the offset
-       is computed from the two bars' real heights and scrolled to directly. */
-    const go = () => {
-      const h = document.getElementById("grp-"+id);
-      if(!h) return;
-      const y = h.getBoundingClientRect().top + window.scrollY - chromeHeight() - 6;
-      window.scrollTo({top: Math.max(0, Math.round(y)), behavior: "smooth"});
-    };
-    if(rebuilt) requestAnimationFrame(go); else go();
-  });
+  bar.querySelectorAll("[data-jump]").forEach(b=>
+    b.onclick=()=>jumpToSection(b.dataset.jump));
   spyJumpbar(live);
 }
 /* Highlight the section currently under the bar. Observed rather than measured
@@ -1497,18 +1486,6 @@ function spyJumpbar(live){
   }, {rootMargin: (-top)+"px 0px -55% 0px"});
   live.forEach(g=>{ const el=document.getElementById("sec-"+g.id); if(el) jumpSpy.observe(el); });
 }
-/* Fold or unfold one section. `open` forces a state; omitted, it toggles.
-   Returns whether anything changed, so a jump can tell when it needs to wait
-   for the relayout before scrolling. */
-function foldSection(id, open){
-  state.settings.folded = state.settings.folded || {};
-  const was = !!state.settings.folded[id];
-  const next = open===undefined ? !was : !open;
-  if(next === was) return false;
-  if(next) state.settings.folded[id] = true; else delete state.settings.folded[id];
-  save(); renderCatalog();
-  return true;
-}
 function renderCatalog(){
   const sw=document.getElementById("stacks");
   sw.innerHTML = STACKS.map(st=>'<button class="quick" data-stack="'+st.id+'"><span>'+st.em+'</span><b>'+esc(st.label)+'</b></button>').join("");
@@ -1519,12 +1496,9 @@ function renderCatalog(){
     /* `retired` hides an item from the capture grid but keeps it in the catalog,
        so previously logged entries still render their real name and dose. */
     const items = CATALOG.filter(c=>c.g===g.id && !c.retired); if(!items.length) return "";
-    const folded = !!(state.settings.folded && state.settings.folded[g.id]);
-    return '<section id="sec-'+g.id+'"'+(folded?' class="folded"':'')+'>'+
-      '<button class="eyebrow ghead" id="grp-'+g.id+'" data-fold="'+g.id+'" '+
-        'aria-expanded="'+(!folded)+'" aria-controls="grid-'+g.id+'">'+
-        '<span class="gchev">\u25BC</span>'+esc(g.label)+
-        '<span class="gcount">'+items.length+'</span></button>'+
+    return '<section id="sec-'+g.id+'">'+
+      '<p class="eyebrow" id="grp-'+g.id+'">'+esc(g.label)+
+        '<span class="gcount">'+items.length+'</span></p>'+
       (g.note?'<p class="gnote">'+esc(g.note)+'</p>':'')+
       '<div class="grid" id="grid-'+g.id+'">'+items.map(c=>
       '<button class="tile" data-id="'+c.id+'">'+
@@ -1538,7 +1512,6 @@ function renderCatalog(){
         '<span class="ds">'+esc(c.fx)+'</span></button>').join("")+'</div></section>';
   }).join("");
   host.querySelectorAll("[data-id]").forEach(b=> b.onclick=()=>openEntry(BY_ID[b.dataset.id]));
-  host.querySelectorAll("[data-fold]").forEach(b=> b.onclick=()=>foldSection(b.dataset.fold));
   renderFrequent();
   renderJumpbar();
   fitTail();

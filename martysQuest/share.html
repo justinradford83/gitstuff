@@ -330,20 +330,9 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .freqchip i.strip{position:absolute;left:0;top:50%;transform:translateY(-50%);
   width:3px;height:56%;border-radius:0 2px 2px 0}
 
-/* ── COLLAPSIBLE SECTIONS ──
-   Folded state is remembered. A jump from the bar always unfolds its target
-   first — arriving at a closed section would make the jump look broken. */
-.eyebrow.ghead{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
-  cursor:pointer;font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0}
-.eyebrow.ghead::after{content:"";flex:1;height:1px;background:var(--line-soft)}
-.eyebrow.ghead .gchev{flex:0 0 auto;font-size:9px;transition:transform .18s ease;
-  display:inline-block;color:var(--ink-3)}
-.eyebrow.ghead[aria-expanded="false"] .gchev{transform:rotate(-90deg)}
-.eyebrow.ghead .gcount{flex:0 0 auto;font-size:9px;color:var(--ink-3);opacity:.75}
-section.folded .grid,section.folded .gnote{display:none}
-section.folded{margin-bottom:4px}
-@media (prefers-reduced-motion:reduce){.eyebrow.ghead .gchev{transition:none}}
+/* Section headings carry their item count. They do not fold: a heading that
+   moves under you is a heading you cannot aim a jump at. */
+.eyebrow .gcount{font-size:9px;color:var(--ink-3);opacity:.75;margin-left:2px}
 
 /* ── SECTION JUMP BAR ──
    Sticks under the header so it is reachable wherever you are in the list.
