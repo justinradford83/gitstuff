@@ -309,6 +309,42 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 @keyframes nudge-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.nudge{animation:none}}
 
+/* ── MOST LOGGED ──
+   Most logging is the same dozen things over and over, so the dozen come to
+   you. Counted over a fortnight, not all time, so the row follows the phase
+   you are actually in rather than calcifying around August. */
+.freqwrap{margin:0 0 14px}
+.freqwrap[hidden]{display:none}
+.freqlbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 7px}
+.freqrow{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;
+  margin:0 calc(var(--pad) * -1);padding:1px var(--pad) 3px}
+.freqrow::-webkit-scrollbar{display:none}
+.freqchip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 13px 8px 10px;
+  border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;position:relative}
+.freqchip .fe{font-size:17px;line-height:1;font-family:var(--emoji)}
+.freqchip .fn{font-weight:500}
+.freqchip .fc{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.freqchip i.strip{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:56%;border-radius:0 2px 2px 0}
+
+/* ── COLLAPSIBLE SECTIONS ──
+   Folded state is remembered. A jump from the bar always unfolds its target
+   first — arriving at a closed section would make the jump look broken. */
+.eyebrow.ghead{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
+  cursor:pointer;font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0}
+.eyebrow.ghead::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+.eyebrow.ghead .gchev{flex:0 0 auto;font-size:9px;transition:transform .18s ease;
+  display:inline-block;color:var(--ink-3)}
+.eyebrow.ghead[aria-expanded="false"] .gchev{transform:rotate(-90deg)}
+.eyebrow.ghead .gcount{flex:0 0 auto;font-size:9px;color:var(--ink-3);opacity:.75}
+section.folded .grid,section.folded .gnote{display:none}
+section.folded{margin-bottom:4px}
+@media (prefers-reduced-motion:reduce){.eyebrow.ghead .gchev{transition:none}}
+
 /* ── SECTION JUMP BAR ──
    Sticks under the header so it is reachable wherever you are in the list.
    The chip for the section you are looking at highlights itself, so the bar

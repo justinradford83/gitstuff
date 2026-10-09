@@ -309,6 +309,42 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 @keyframes nudge-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.nudge{animation:none}}
 
+/* ── MOST LOGGED ──
+   Most logging is the same dozen things over and over, so the dozen come to
+   you. Counted over a fortnight, not all time, so the row follows the phase
+   you are actually in rather than calcifying around August. */
+.freqwrap{margin:0 0 14px}
+.freqwrap[hidden]{display:none}
+.freqlbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 7px}
+.freqrow{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;
+  margin:0 calc(var(--pad) * -1);padding:1px var(--pad) 3px}
+.freqrow::-webkit-scrollbar{display:none}
+.freqchip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 13px 8px 10px;
+  border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;position:relative}
+.freqchip .fe{font-size:17px;line-height:1;font-family:var(--emoji)}
+.freqchip .fn{font-weight:500}
+.freqchip .fc{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums}
+.freqchip i.strip{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:56%;border-radius:0 2px 2px 0}
+
+/* ── COLLAPSIBLE SECTIONS ──
+   Folded state is remembered. A jump from the bar always unfolds its target
+   first — arriving at a closed section would make the jump look broken. */
+.eyebrow.ghead{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
+  cursor:pointer;font:inherit;font-family:var(--mono);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0}
+.eyebrow.ghead::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+.eyebrow.ghead .gchev{flex:0 0 auto;font-size:9px;transition:transform .18s ease;
+  display:inline-block;color:var(--ink-3)}
+.eyebrow.ghead[aria-expanded="false"] .gchev{transform:rotate(-90deg)}
+.eyebrow.ghead .gcount{flex:0 0 auto;font-size:9px;color:var(--ink-3);opacity:.75}
+section.folded .grid,section.folded .gnote{display:none}
+section.folded{margin-bottom:4px}
+@media (prefers-reduced-motion:reduce){.eyebrow.ghead .gchev{transition:none}}
+
 /* ── SECTION JUMP BAR ──
    Sticks under the header so it is reachable wherever you are in the list.
    The chip for the section you are looking at highlights itself, so the bar
@@ -608,6 +644,10 @@ nav.tabs button.on{color:var(--accent);border-top-color:var(--accent)}
     <p class="eyebrow">Capture</p>
     <h2 class="sec">What did you do?</h2>
     <div class="quickrow" id="stacks"></div>
+    <div class="freqwrap" id="freqwrap" hidden>
+      <p class="freqlbl">Most logged · last 14 days</p>
+      <div class="freqrow" id="freqrow"></div>
+    </div>
     <nav class="jumpbar" id="jumpbar" aria-label="Jump to a section"></nav>
     <div id="catalogGroups"></div>
     <p class="disclaimer">A personal log, not medical advice. Ceilings and phase dates are defaults you can
@@ -1035,6 +1075,7 @@ function migrate(o){
   o.settings.baselineNeed ??= 6.5;   /* keep in step with sleepdebt/config.yaml */
   o.settings.debtWindow  ??= 14;
   o.settings.moodRange   ??= 30;
+  o.settings.folded      ??= {};
   if(!o.settings.quetMg){
     o.entries.forEach(e=>{ const mg=QUET_MG[e.id]; if(mg) e.q = Math.round(e.q*mg); });
     o.settings.quetMg = true;
@@ -1332,6 +1373,43 @@ scrim.onclick=closeSheet;
 function showSheet(h){ sheet.innerHTML=h; scrim.classList.add("on"); sheet.classList.add("on"); }
 
 /* ════════ 1 · CAPTURE ════════ */
+/* ── MOST LOGGED ──
+   Counted by entries over a fortnight, so the row tracks the phase you are in
+   rather than settling on whatever August looked like. Retired items drop out
+   on their own: they cannot be logged, so they fall off the window. A chip
+   opens the same sheet the tile does — it skips the hunt, not the dose field,
+   which is not somewhere to save a tap. */
+const FREQ_DAYS = 14, FREQ_MAX = 6;
+function frequentItems(){
+  const from = addDays(todayISO(), -(FREQ_DAYS-1));
+  const n = {};
+  state.entries.forEach(e=>{
+    if(e.date < from) return;
+    const c = BY_ID[e.id];
+    if(!c || c.retired) return;
+    n[e.id] = (n[e.id]||0) + 1;
+  });
+  return Object.entries(n)
+    .sort((a,b)=> b[1]-a[1] || BY_ID[a[0]].name.localeCompare(BY_ID[b[0]].name))
+    .slice(0, FREQ_MAX)
+    .map(([id,count])=>({c:BY_ID[id], count}));
+}
+function renderFrequent(){
+  const wrap = document.getElementById("freqwrap"), row = document.getElementById("freqrow");
+  if(!wrap || !row) return;
+  const top = frequentItems();
+  wrap.hidden = !top.length;
+  if(!top.length) return;
+  row.innerHTML = top.map(({c,count})=>{
+    const g = GROUPS.find(x=>x.id===c.g);
+    return '<button class="freqchip" data-freq="'+c.id+'">'+
+      '<i class="strip" style="background:'+(g?g.color:"var(--line)")+'"></i>'+
+      '<span class="fe">'+c.em+'</span><span class="fn">'+esc(c.name)+'</span>'+
+      '<span class="fc">'+count+'</span></button>';
+  }).join("");
+  row.querySelectorAll("[data-freq]").forEach(b=>
+    b.onclick=()=>openEntry(BY_ID[b.dataset.freq]));
+}
 /* ── SECTION JUMP BAR ──
    One chip per section that actually has tiles, so retiring an item can empty
    a section out of both the list and the bar at once. */
@@ -1343,8 +1421,13 @@ function renderJumpbar(){
     '<button data-jump="'+g.id+'"><i style="background:'+g.color+'"></i>'+
     esc(g.short||g.label)+'</button>').join("");
   bar.querySelectorAll("[data-jump]").forEach(b=> b.onclick=()=>{
-    const h = document.getElementById("grp-"+b.dataset.jump);
-    if(h) h.scrollIntoView({behavior:"smooth", block:"start"});
+    const id = b.dataset.jump;
+    /* Landing on a folded section would read as a broken jump, so open it
+       first; renderCatalog rebuilds the DOM, so re-find the heading after. */
+    const rebuilt = foldSection(id, true);
+    const go = () => { const h = document.getElementById("grp-"+id);
+      if(h) h.scrollIntoView({behavior:"smooth", block:"start"}); };
+    if(rebuilt) requestAnimationFrame(go); else go();
   });
   spyJumpbar(live);
 }
@@ -1373,6 +1456,18 @@ function spyJumpbar(live){
   }, {rootMargin: (-top)+"px 0px -55% 0px"});
   live.forEach(g=>{ const el=document.getElementById("sec-"+g.id); if(el) jumpSpy.observe(el); });
 }
+/* Fold or unfold one section. `open` forces a state; omitted, it toggles.
+   Returns whether anything changed, so a jump can tell when it needs to wait
+   for the relayout before scrolling. */
+function foldSection(id, open){
+  state.settings.folded = state.settings.folded || {};
+  const was = !!state.settings.folded[id];
+  const next = open===undefined ? !was : !open;
+  if(next === was) return false;
+  if(next) state.settings.folded[id] = true; else delete state.settings.folded[id];
+  save(); renderCatalog();
+  return true;
+}
 function renderCatalog(){
   const sw=document.getElementById("stacks");
   sw.innerHTML = STACKS.map(st=>'<button class="quick" data-stack="'+st.id+'"><span>'+st.em+'</span><b>'+esc(st.label)+'</b></button>').join("");
@@ -1383,8 +1478,14 @@ function renderCatalog(){
     /* `retired` hides an item from the capture grid but keeps it in the catalog,
        so previously logged entries still render their real name and dose. */
     const items = CATALOG.filter(c=>c.g===g.id && !c.retired); if(!items.length) return "";
-    return '<section id="sec-'+g.id+'"><p class="eyebrow" id="grp-'+g.id+'">'+esc(g.label)+'</p>'+
-      (g.note?'<p class="gnote">'+esc(g.note)+'</p>':'')+'<div class="grid">'+items.map(c=>
+    const folded = !!(state.settings.folded && state.settings.folded[g.id]);
+    return '<section id="sec-'+g.id+'"'+(folded?' class="folded"':'')+'>'+
+      '<button class="eyebrow ghead" id="grp-'+g.id+'" data-fold="'+g.id+'" '+
+        'aria-expanded="'+(!folded)+'" aria-controls="grid-'+g.id+'">'+
+        '<span class="gchev">\u25BC</span>'+esc(g.label)+
+        '<span class="gcount">'+items.length+'</span></button>'+
+      (g.note?'<p class="gnote">'+esc(g.note)+'</p>':'')+
+      '<div class="grid" id="grid-'+g.id+'">'+items.map(c=>
       '<button class="tile" data-id="'+c.id+'">'+
         '<i class="strip" style="background:'+g.color+'"></i>'+
         (c.dot?'<i class="earns" style="background:'+dotVar(c.dot)+'" title="Earns the '+DOT_BY[c.dot].name+' dot"></i>':'')+
@@ -1396,6 +1497,8 @@ function renderCatalog(){
         '<span class="ds">'+esc(c.fx)+'</span></button>').join("")+'</div></section>';
   }).join("");
   host.querySelectorAll("[data-id]").forEach(b=> b.onclick=()=>openEntry(BY_ID[b.dataset.id]));
+  host.querySelectorAll("[data-fold]").forEach(b=> b.onclick=()=>foldSection(b.dataset.fold));
+  renderFrequent();
   renderJumpbar();
 }
 function openEntry(c){
@@ -2398,7 +2501,11 @@ function setHdrVar(){
 }
 addEventListener("resize", setHdrVar);
 function renderAll(){ setHdrVar(); renderHeader(); renderBoard(); renderLedger(); renderDash(); renderPlan();
-  renderNudge(); }
+  renderNudge();
+  /* The counts move every time something is logged, so the row is refreshed
+     with everything else — but not the whole catalog, which would rebuild the
+     grid and throw away the fold state's DOM on every tap. */
+  renderFrequent(); }
 /* The hour can roll over while the app simply sits open. */
 setInterval(renderNudge, 60000);
 
