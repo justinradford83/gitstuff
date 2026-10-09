@@ -23,6 +23,8 @@
   --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --emoji:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",
+    "Android Emoji",EmojiSymbols,sans-serif;
   --r-sm:6px; --r:10px; --r-lg:16px; --pad:16px; --tabbar:66px;
 }
 @media (prefers-color-scheme:light){
@@ -108,7 +110,7 @@ h2.sec{font-family:var(--serif);font-size:20px;font-weight:600;margin:0 0 4px;le
   padding:11px 9px 10px;text-align:left;display:flex;flex-direction:column;gap:5px;min-height:112px;
   position:relative;transition:transform .1s ease,border-color .1s ease}
 .tile:hover{border-color:var(--accent);transform:translateY(-1px)}
-.tile .em{font-size:21px;line-height:1}
+.tile .em{font-size:21px;line-height:1;font-family:var(--emoji)}
 .tile .nm{font-size:11.5px;font-weight:600;line-height:1.25}
 .tile .cm{font-size:10px;color:var(--ink-3);line-height:1.3;margin-top:-2px}
 .tile .dose{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.01em;line-height:1.2}
@@ -293,7 +295,7 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
   background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);
   color:var(--ink-2);font:inherit;cursor:pointer;text-align:center;min-height:84px;
   justify-content:center}
-.moodtile .me{font-size:26px;line-height:1}
+.moodtile .me{font-size:26px;line-height:1;font-family:var(--emoji)}
 .moodtile .mk{font-size:11px;line-height:1.2;font-weight:600}
 .moodtile .mv{font-family:var(--mono);font-size:8.5px;color:var(--ink-3);letter-spacing:.06em}
 .moodtile[aria-checked="true"]{border-color:var(--d-purple);background:var(--surface-3);color:var(--ink);
@@ -301,7 +303,7 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .moodtile[aria-checked="true"] .mv{color:var(--d-purple)}
 .moodsay{border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin:0 0 14px;
   background:var(--surface-2);display:flex;gap:11px;align-items:center;min-height:62px}
-.moodsay .se{font-size:28px;line-height:1}
+.moodsay .se{font-size:28px;line-height:1;font-family:var(--emoji)}
 .moodsay .st b{display:block;font-size:14px;font-weight:600;margin-bottom:2px}
 .moodsay .st span{font-size:12.5px;color:var(--ink-2);line-height:1.4}
 /* range switch above the mood chart */
@@ -825,15 +827,18 @@ function asrmEntries(){
    the top end is what the ASRM next door screens for, and the bottom end is
    the one that does not announce itself. The chart marks both tails and
    neither is drawn as the goal. */
+/* Every one of these is a face. The earlier set used a rain cloud and a
+   lightning bolt for two of the rungs, which made those two read as weather
+   rather than as a feeling. */
 const MOODS = [
   {v:1, em:"😩", k:"Hopeless",    d:"Nothing will change and nothing helps. The far low end."},
-  {v:2, em:"😔", k:"Depressed",   d:"Heavy and shut down. Little interest in anything."},
-  {v:3, em:"🌧️", k:"Low",         d:"Down, but still moving through the day."},
+  {v:2, em:"😢", k:"Depressed",   d:"Heavy and shut down. Little interest in anything."},
+  {v:3, em:"😔", k:"Low",         d:"Down, but still moving through the day."},
   {v:4, em:"😰", k:"Overwhelmed", d:"Too much at once. Wound up and unable to get on top of it."},
   {v:5, em:"😐", k:"Flat",        d:"Nothing much either way. Going through the motions."},
   {v:6, em:"🙂", k:"Steady",      d:"Level and okay. Your baseline."},
-  {v:7, em:"😄", k:"Happy",       d:"Genuinely up and light. Enjoying things."},
-  {v:8, em:"⚡", k:"Elevated",    d:"Energized, driven, fast. More output than usual."},
+  {v:7, em:"😊", k:"Happy",       d:"Genuinely up and light. Enjoying things."},
+  {v:8, em:"🤩", k:"Elevated",    d:"Energized, driven, fast. More output than usual."},
   {v:9, em:"🫨", k:"Hypomanic",   d:"Racing and unstoppable. Little need for sleep. The far high end."}
 ];
 const MOOD_BY = Object.fromEntries(MOODS.map(m=>[m.v,m]));
