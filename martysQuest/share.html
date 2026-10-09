@@ -284,6 +284,35 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .sleepcard .stale{font-size:11.5px;color:var(--ink-3);margin:13px 0 0;padding-top:11px;
   border-top:1px solid var(--line-soft);line-height:1.45}
 .sleepcard .stale b{font-weight:600;color:var(--ink-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* ── MOOD PICKER ──
+   A 3x3 of tiles reading worst at the top-left to most elevated at the
+   bottom-right, so the order is spatial as well as numeric. Radio semantics
+   without radio chrome, same as the ASRM sheet. */
+.moodgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 13px}
+.moodtile{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 6px 10px;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);
+  color:var(--ink-2);font:inherit;cursor:pointer;text-align:center;min-height:84px;
+  justify-content:center}
+.moodtile .me{font-size:26px;line-height:1}
+.moodtile .mk{font-size:11px;line-height:1.2;font-weight:600}
+.moodtile .mv{font-family:var(--mono);font-size:8.5px;color:var(--ink-3);letter-spacing:.06em}
+.moodtile[aria-checked="true"]{border-color:var(--d-purple);background:var(--surface-3);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--d-purple)}
+.moodtile[aria-checked="true"] .mv{color:var(--d-purple)}
+.moodsay{border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin:0 0 14px;
+  background:var(--surface-2);display:flex;gap:11px;align-items:center;min-height:62px}
+.moodsay .se{font-size:28px;line-height:1}
+.moodsay .st b{display:block;font-size:14px;font-weight:600;margin-bottom:2px}
+.moodsay .st span{font-size:12.5px;color:var(--ink-2);line-height:1.4}
+/* range switch above the mood chart */
+.rangerow{display:flex;gap:6px;margin:0 0 12px}
+.rangebtn{flex:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 4px;border-radius:var(--r-sm);border:1px solid var(--line-soft);background:var(--surface);
+  color:var(--ink-3);cursor:pointer}
+.rangebtn.on{border-color:var(--d-purple);color:var(--d-purple);background:var(--surface-3)}
+.moodstat{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 0;font-size:11.5px;color:var(--ink-3)}
+.moodstat b{font-family:var(--mono);color:var(--ink-2);font-weight:600}
+
 /* ── ASRM QUESTIONNAIRE ──
    Radio semantics without radio chrome: one option per group is `aria-checked`,
    arrow keys move within a group, and the group is a real radiogroup so a
@@ -789,10 +818,42 @@ function asrmEntries(){
     .sort((a,b)=>(a.date+a.time)<(b.date+b.time)?-1:1);
 }
 
+/* ════════ MOOD — a nine-point spectrum ════════
+   Hopeless at one pole, hypomanic at the other. This is NOT a good-to-bad
+   ladder and nothing here is a target: 9 is as far from baseline as 1 is, just
+   in the other direction. Baseline is the middle. Both ends are what matter —
+   the top end is what the ASRM next door screens for, and the bottom end is
+   the one that does not announce itself. The chart marks both tails and
+   neither is drawn as the goal. */
+const MOODS = [
+  {v:1, em:"😩", k:"Hopeless",    d:"Nothing will change and nothing helps. The far low end."},
+  {v:2, em:"😔", k:"Depressed",   d:"Heavy and shut down. Little interest in anything."},
+  {v:3, em:"🌧️", k:"Low",         d:"Down, but still moving through the day."},
+  {v:4, em:"😰", k:"Overwhelmed", d:"Too much at once. Wound up and unable to get on top of it."},
+  {v:5, em:"😐", k:"Flat",        d:"Nothing much either way. Going through the motions."},
+  {v:6, em:"🙂", k:"Steady",      d:"Level and okay. Your baseline."},
+  {v:7, em:"😄", k:"Happy",       d:"Genuinely up and light. Enjoying things."},
+  {v:8, em:"⚡", k:"Elevated",    d:"Energized, driven, fast. More output than usual."},
+  {v:9, em:"🫨", k:"Hypomanic",   d:"Racing and unstoppable. Little need for sleep. The far high end."}
+];
+const MOOD_BY = Object.fromEntries(MOODS.map(m=>[m.v,m]));
+/* the two tails, each a distance from baseline rather than a rank */
+const MOOD_LOW = 3, MOOD_HIGH = 8;
+/* Every day in the window that carries a mood, oldest first. */
+function moodDays(days){
+  const out=[], t=todayISO();
+  for(let i=days-1;i>=0;i--){
+    const iso=addDays(t,-i), d=state.daily[iso];
+    out.push({iso, v: d && d.mood9!=null ? d.mood9 : null});
+  }
+  return out;
+}
+const MOOD_RANGES = [{d:7,  l:"Week"}, {d:30, l:"Month"}, {d:90, l:"90 days"}];
+
 /* ════════ CATALOG ════════ */
 const GROUPS = [
   {id:"mind",  label:"Mental health",           color:"var(--d-purple)",
-   note:"Running the mania self-rating earns SPIRITUAL. It is a screen, not a diagnosis."},
+   note:"A mood check or the mania self-rating earns SPIRITUAL. Both are self-reports, not diagnoses."},
   {id:"pain",  label:"Pain control",            color:"var(--crit)"},
   {id:"sleep", label:"Sleep",                   color:"var(--accent)"},
   {id:"supp",  label:"Vitamins & supplements",  color:"var(--good)"},
@@ -817,6 +878,7 @@ const GROUPS = [
 const CATALOG = [
   {id:"lamo",   em:"⚖️",   name:"Lamotrigine",             common:"Lamictal · 1 tab twice daily", dose:"25 mg", unit:"tab", q:1, g:"mind", fx:"Mood stabiliser"},
   {id:"asrm",   em:"🧭",   name:"Mania self-rating",       common:"Altman scale · 5 questions", dose:"—", unit:"pts", q:0, g:"mind", fx:"Mood screening", dot:"purple", scaleMax:20, asrmTest:true},
+  {id:"mood",   em:"🎭",   name:"Mood check",              common:"nine-point day scale", dose:"—", unit:"", q:0, g:"mind", fx:"Mood tracking", dot:"purple", scaleMax:9, moodPick:true},
 
   {id:"apap",   em:"💊",   name:"Acetaminophen",           common:"Tylenol Extra Strength", dose:"500 mg", unit:"tab", q:2, g:"pain", fx:"Pain relief", mgApap:500},
   {id:"ibu",    em:"🧯",   name:"Ibuprofen",               common:"Advil", dose:"200 mg", unit:"tab", q:2, g:"pain", fx:"Anti-inflammatory"},
@@ -1259,6 +1321,64 @@ function arcGauge(pct){
     (v>0?'<path d="'+arc(start,start+span*v,r)+'" fill="none" stroke="'+
       (gold?"var(--sand)":"var(--accent)")+'" stroke-width="7" stroke-linecap="round"/>':'')+
     '</svg>';
+}
+/* ── MOOD OVER TIME ──
+   One measure, one series, so no legend — the title names it. Both tails are
+   marked rather than just the low one: on this scale 9 is not the goal, and a
+   week spent at the top is the pattern most worth catching early. Gaps are left
+   as gaps; a day with no mood logged is not drawn through. */
+function moodChart(rows){
+  const W=640,H=200,mL=30,mR=12,mT=16,mB=28,iw=W-mL-mR,ih=H-mT-mB;
+  const n=Math.max(rows.length,1);
+  const y=v=>mT+ih-((v-1)/8)*ih, x=i=>mL+(n===1?iw/2:(i/(n-1))*iw);
+  const grid=[1,3,5,7,9].map(v=>'<line x1="'+mL+'" x2="'+(W-mR)+'" y1="'+y(v).toFixed(1)+
+    '" y2="'+y(v).toFixed(1)+'" stroke="var(--grid)" stroke-width="1"/>'+
+    '<text x="'+(mL-7)+'" y="'+(y(v)+3.5).toFixed(1)+'" text-anchor="end" '+
+    'font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+v+'</text>').join("");
+  /* reference bands — status colours, each with a visible label, never colour alone */
+  const bands=
+    '<rect x="'+mL+'" y="'+y(MOOD_LOW).toFixed(1)+'" width="'+iw+'" height="'+(y(1)-y(MOOD_LOW)).toFixed(1)+
+      '" fill="var(--crit)" opacity=".10"/>'+
+    '<rect x="'+mL+'" y="'+mT+'" width="'+iw+'" height="'+(y(MOOD_HIGH)-mT).toFixed(1)+
+      '" fill="var(--warn)" opacity=".10"/>'+
+    '<text x="'+(W-mR-3)+'" y="'+(mT+11)+'" text-anchor="end" font-family="var(--mono)" '+
+      'font-size="9" fill="var(--warn)" stroke="var(--surface)" stroke-width="3" '+
+      'paint-order="stroke" stroke-linejoin="round">elevated</text>'+
+    '<text x="'+(W-mR-3)+'" y="'+(y(1)-4).toFixed(1)+'" text-anchor="end" font-family="var(--mono)" '+
+      'font-size="9" fill="var(--crit)" stroke="var(--surface)" stroke-width="3" '+
+      'paint-order="stroke" stroke-linejoin="round">low</text>';
+  const pts=rows.map((r,i)=>r.v!=null?{i,v:r.v,iso:r.iso}:null).filter(Boolean);
+  if(!pts.length) return '<svg class="chart" viewBox="0 0 '+W+' '+H+'">'+bands+grid+
+    '<text x="'+(W/2)+'" y="'+(H/2+16)+'" text-anchor="middle" font-family="var(--mono)" '+
+    'font-size="11" fill="var(--ink-3)">no moods logged in this window</text></svg>';
+  /* break the line across gaps instead of implying days that were never logged */
+  const segs=[]; let cur=[];
+  pts.forEach(pt=>{ if(cur.length && pt.i!==cur[cur.length-1].i+1){segs.push(cur);cur=[];} cur.push(pt); });
+  segs.push(cur);
+  const line=segs.filter(sg=>sg.length>1).map(sg=>'<polyline points="'+
+    sg.map(pt=>x(pt.i).toFixed(1)+","+y(pt.v).toFixed(1)).join(" ")+
+    '" fill="none" stroke="var(--d-purple)" stroke-width="2" stroke-linejoin="round" '+
+    'stroke-linecap="round"/>').join("");
+  const dense = n>45, r0 = dense?2.6:4.5;
+  const dots=pts.map((pt,k)=>{
+    const last=k===pts.length-1;
+    const col=pt.v>=MOOD_HIGH?"var(--warn)":pt.v<=MOOD_LOW?"var(--crit)":"var(--d-purple)";
+    return '<circle cx="'+x(pt.i).toFixed(1)+'" cy="'+y(pt.v).toFixed(1)+'" r="'+(last?r0+1.5:r0)+
+      '" fill="'+col+'" stroke="var(--surface)" stroke-width="'+(dense?1:2)+'"/>'+
+      '<circle cx="'+x(pt.i).toFixed(1)+'" cy="'+y(pt.v).toFixed(1)+'" r="11" fill="transparent" '+
+      'data-tip="'+esc(shortDate(pt.iso))+'|'+MOOD_BY[pt.v].em+' '+esc(MOOD_BY[pt.v].k)+
+      ' ('+pt.v+'/9)|'+esc(MOOD_BY[pt.v].d)+'"/>'; }).join("");
+  const every=Math.max(1,Math.ceil(n/6));
+  const lab=rows.map((r,i)=>{
+    if(i%every!==0 && i!==n-1) return "";
+    /* the first and last tick would hang off the plot if centred on it */
+    const anchor = i===n-1 ? "end" : i===0 ? "start" : "middle";
+    return '<text x="'+x(i).toFixed(1)+'" y="'+(H-9)+'" text-anchor="'+anchor+
+      '" font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+esc(shortDate(r.iso))+'</text>';
+  }).join("");
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" '+
+    'aria-label="Daily mood on a nine-point scale, with the low and elevated bands marked">'+
+    bands+grid+line+dots+lab+'</svg>';
 }
 /* ── ASRM OVER TIME ──
    Scores are irregular by nature — you take one when you think to — so the

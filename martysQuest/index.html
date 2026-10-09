@@ -284,6 +284,35 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .sleepcard .stale{font-size:11.5px;color:var(--ink-3);margin:13px 0 0;padding-top:11px;
   border-top:1px solid var(--line-soft);line-height:1.45}
 .sleepcard .stale b{font-weight:600;color:var(--ink-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* ── MOOD PICKER ──
+   A 3x3 of tiles reading worst at the top-left to most elevated at the
+   bottom-right, so the order is spatial as well as numeric. Radio semantics
+   without radio chrome, same as the ASRM sheet. */
+.moodgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 13px}
+.moodtile{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 6px 10px;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);
+  color:var(--ink-2);font:inherit;cursor:pointer;text-align:center;min-height:84px;
+  justify-content:center}
+.moodtile .me{font-size:26px;line-height:1}
+.moodtile .mk{font-size:11px;line-height:1.2;font-weight:600}
+.moodtile .mv{font-family:var(--mono);font-size:8.5px;color:var(--ink-3);letter-spacing:.06em}
+.moodtile[aria-checked="true"]{border-color:var(--d-purple);background:var(--surface-3);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--d-purple)}
+.moodtile[aria-checked="true"] .mv{color:var(--d-purple)}
+.moodsay{border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin:0 0 14px;
+  background:var(--surface-2);display:flex;gap:11px;align-items:center;min-height:62px}
+.moodsay .se{font-size:28px;line-height:1}
+.moodsay .st b{display:block;font-size:14px;font-weight:600;margin-bottom:2px}
+.moodsay .st span{font-size:12.5px;color:var(--ink-2);line-height:1.4}
+/* range switch above the mood chart */
+.rangerow{display:flex;gap:6px;margin:0 0 12px}
+.rangebtn{flex:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 4px;border-radius:var(--r-sm);border:1px solid var(--line-soft);background:var(--surface);
+  color:var(--ink-3);cursor:pointer}
+.rangebtn.on{border-color:var(--d-purple);color:var(--d-purple);background:var(--surface-3)}
+.moodstat{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0 0;font-size:11.5px;color:var(--ink-3)}
+.moodstat b{font-family:var(--mono);color:var(--ink-2);font-weight:600}
+
 /* ── ASRM QUESTIONNAIRE ──
    Radio semantics without radio chrome: one option per group is `aria-checked`,
    arrow keys move within a group, and the group is a real radiogroup so a
@@ -790,10 +819,42 @@ function asrmEntries(){
     .sort((a,b)=>(a.date+a.time)<(b.date+b.time)?-1:1);
 }
 
+/* ════════ MOOD — a nine-point spectrum ════════
+   Hopeless at one pole, hypomanic at the other. This is NOT a good-to-bad
+   ladder and nothing here is a target: 9 is as far from baseline as 1 is, just
+   in the other direction. Baseline is the middle. Both ends are what matter —
+   the top end is what the ASRM next door screens for, and the bottom end is
+   the one that does not announce itself. The chart marks both tails and
+   neither is drawn as the goal. */
+const MOODS = [
+  {v:1, em:"😩", k:"Hopeless",    d:"Nothing will change and nothing helps. The far low end."},
+  {v:2, em:"😔", k:"Depressed",   d:"Heavy and shut down. Little interest in anything."},
+  {v:3, em:"🌧️", k:"Low",         d:"Down, but still moving through the day."},
+  {v:4, em:"😰", k:"Overwhelmed", d:"Too much at once. Wound up and unable to get on top of it."},
+  {v:5, em:"😐", k:"Flat",        d:"Nothing much either way. Going through the motions."},
+  {v:6, em:"🙂", k:"Steady",      d:"Level and okay. Your baseline."},
+  {v:7, em:"😄", k:"Happy",       d:"Genuinely up and light. Enjoying things."},
+  {v:8, em:"⚡", k:"Elevated",    d:"Energized, driven, fast. More output than usual."},
+  {v:9, em:"🫨", k:"Hypomanic",   d:"Racing and unstoppable. Little need for sleep. The far high end."}
+];
+const MOOD_BY = Object.fromEntries(MOODS.map(m=>[m.v,m]));
+/* the two tails, each a distance from baseline rather than a rank */
+const MOOD_LOW = 3, MOOD_HIGH = 8;
+/* Every day in the window that carries a mood, oldest first. */
+function moodDays(days){
+  const out=[], t=todayISO();
+  for(let i=days-1;i>=0;i--){
+    const iso=addDays(t,-i), d=state.daily[iso];
+    out.push({iso, v: d && d.mood9!=null ? d.mood9 : null});
+  }
+  return out;
+}
+const MOOD_RANGES = [{d:7,  l:"Week"}, {d:30, l:"Month"}, {d:90, l:"90 days"}];
+
 /* ════════ CATALOG ════════ */
 const GROUPS = [
   {id:"mind",  label:"Mental health",           color:"var(--d-purple)",
-   note:"Running the mania self-rating earns SPIRITUAL. It is a screen, not a diagnosis."},
+   note:"A mood check or the mania self-rating earns SPIRITUAL. Both are self-reports, not diagnoses."},
   {id:"pain",  label:"Pain control",            color:"var(--crit)"},
   {id:"sleep", label:"Sleep",                   color:"var(--accent)"},
   {id:"supp",  label:"Vitamins & supplements",  color:"var(--good)"},
@@ -818,6 +879,7 @@ const GROUPS = [
 const CATALOG = [
   {id:"lamo",   em:"⚖️",   name:"Lamotrigine",             common:"Lamictal · 1 tab twice daily", dose:"25 mg", unit:"tab", q:1, g:"mind", fx:"Mood stabiliser"},
   {id:"asrm",   em:"🧭",   name:"Mania self-rating",       common:"Altman scale · 5 questions", dose:"—", unit:"pts", q:0, g:"mind", fx:"Mood screening", dot:"purple", scaleMax:20, asrmTest:true},
+  {id:"mood",   em:"🎭",   name:"Mood check",              common:"nine-point day scale", dose:"—", unit:"", q:0, g:"mind", fx:"Mood tracking", dot:"purple", scaleMax:9, moodPick:true},
 
   {id:"apap",   em:"💊",   name:"Acetaminophen",           common:"Tylenol Extra Strength", dose:"500 mg", unit:"tab", q:2, g:"pain", fx:"Pain relief", mgApap:500},
   {id:"ibu",    em:"🧯",   name:"Ibuprofen",               common:"Advil", dose:"200 mg", unit:"tab", q:2, g:"pain", fx:"Anti-inflammatory"},
@@ -1031,6 +1093,7 @@ function migrate(o){
   o.settings.timeUnit ||= "days";
   o.settings.baselineNeed ??= 6.5;   /* keep in step with sleepdebt/config.yaml */
   o.settings.debtWindow  ??= 14;
+  o.settings.moodRange   ??= 30;
   if(!o.settings.quetMg){
     o.entries.forEach(e=>{ const mg=QUET_MG[e.id]; if(mg) e.q = Math.round(e.q*mg); });
     o.settings.quetMg = true;
@@ -1042,7 +1105,8 @@ function seedState(){
     entries: SEED_ENTRIES.map((e,i)=>({uid:"s"+i, ...e})),
     daily: JSON.parse(JSON.stringify(SEED_DAILY)),
     done:{}, board:{}, bench:{},
-    settings:{apapTab:500, apapLimit:4000, theme:null, timeUnit:"days", baselineNeed:6.5, debtWindow:14}
+    settings:{apapTab:500, apapLimit:4000, theme:null, timeUnit:"days", baselineNeed:6.5,
+              debtWindow:14, moodRange:30}
   });
 }
 function save(){
@@ -1354,6 +1418,7 @@ function renderCatalog(){
 function openEntry(c){
   if(c.checkin) return openCheckin();
   if(c.asrmTest) return openASRM();
+  if(c.moodPick) return openMood();
   const isAct = ["rehab","fit","body","care"].includes(c.g);
   showSheet(
     '<h3>'+c.em+' '+esc(c.name)+'</h3>'+
@@ -1394,6 +1459,71 @@ function openEntry(c){
     celebrateIfStar(e.date);
   };
 }
+/* ── THE MOOD CHECK ──
+   One mood per day. Re-running it replaces the day rather than stacking a
+   second row, so the chart stays one point per day and the ledger does not
+   fill up with revisions. */
+function openMood(){
+  const iso = todayISO();
+  const existing = state.daily[iso] && state.daily[iso].mood9 != null
+                 ? state.daily[iso].mood9 : null;
+  let pick = existing;
+  showSheet('<h3>🎭 Mood check</h3>'+
+    '<p class="sh-sub">Where did today sit? · hopeless → hypomanic</p>'+
+    '<div class="moodgrid" role="radiogroup" aria-label="Mood">'+MOODS.map(m=>
+      '<button type="button" class="moodtile" role="radio" aria-checked="false" data-m="'+m.v+'">'+
+        '<span class="me">'+m.em+'</span><span class="mk">'+esc(m.k)+'</span>'+
+        '<span class="mv">'+m.v+'</span></button>').join("")+'</div>'+
+    '<div class="moodsay" id="msay"></div>'+
+    '<div class="row2"><div class="field"><label>Date</label>'+
+      '<input type="date" id="d" value="'+iso+'"></div>'+
+      '<div class="field"><label>Time</label><input type="time" id="t" value="'+nowHM()+'"></div></div>'+
+    '<div class="field"><label>Notes</label><textarea id="n" placeholder="'+
+      'What was going on? Sleep, pain, people, anything that moved it"></textarea></div>'+
+    '<div class="btnrow"><button class="btn ghost" id="cancel">Cancel</button>'+
+      '<button class="btn" id="ok" disabled>Save mood</button></div>');
+
+  function paint(){
+    sheet.querySelectorAll(".moodtile").forEach(b=>
+      b.setAttribute("aria-checked", pick===+b.dataset.m ? "true" : "false"));
+    const m = pick!=null ? MOOD_BY[pick] : null;
+    document.getElementById("msay").innerHTML = m
+      ? '<span class="se">'+m.em+'</span><span class="st"><b>'+esc(m.k)+
+        (m.v>=MOOD_HIGH?' — the high end':m.v<=MOOD_LOW?' — the low end':
+         m.v===6?' — baseline':'')+
+        '</b><span>'+esc(m.d)+'</span></span>'
+      : '<span class="st"><span>Pick the one that fits today. There is no right answer and '+
+        'no best end — the middle is baseline.</span></span>';
+    document.getElementById("ok").disabled = pick==null;
+  }
+  sheet.querySelectorAll(".moodtile").forEach(b=>
+    b.onclick=()=>{ pick=+b.dataset.m; paint(); });
+  sheet.querySelector('[role="radiogroup"]').addEventListener("keydown", ev=>{
+    const step = ev.key==="ArrowRight"||ev.key==="ArrowDown" ? 1
+               : ev.key==="ArrowLeft" ||ev.key==="ArrowUp"   ? -1 : 0;
+    if(!step) return;
+    ev.preventDefault();
+    pick = Math.max(1, Math.min(9, (pick==null?0:pick)+step));
+    paint();
+    sheet.querySelector('.moodtile[data-m="'+pick+'"]').focus();
+  });
+  paint();
+  document.getElementById("cancel").onclick=closeSheet;
+  document.getElementById("ok").onclick=()=>{
+    const date=document.getElementById("d").value, time=document.getElementById("t").value;
+    if(!date||!time||pick==null) return;
+    const m=MOOD_BY[pick], userNote=document.getElementById("n").value.trim();
+    /* one row per day, keyed by date, so re-checking updates rather than piles up */
+    state.entries = state.entries.filter(e=>e.uid!=="mood:"+date);
+    state.entries.push({uid:"mood:"+date, date, time, id:"mood", q:pick,
+      note:(userNote?userNote+" — ":"")+m.em+" "+m.k+" ("+pick+"/9)"});
+    state.daily[date] = Object.assign({}, state.daily[date]||{}, {mood9:pick});
+    save(); closeSheet(); renderAll();
+    toast(m.em+" "+m.k+" logged · SPIRITUAL dot earned");
+    celebrateIfStar(date);
+  };
+}
+
 /* ── THE MANIA SELF-RATING ──
    One sheet, five groups, a live total. Save stays disabled until all five are
    answered: a partial ASRM is not a low score, it is not a score at all. */
@@ -1531,7 +1661,8 @@ function openCheckin(){
     '<div class="field"><label>Efficiency %</label><input type="number" id="ef" step="1" min="0" max="100" value="'+(d.eff??"")+'" placeholder="88"></div></div>'+
     '<div class="row2"><div class="field"><label>Resting HR</label><input type="number" id="hr" value="'+(d.rhr??"")+'" placeholder="60"></div>'+
     '<div class="field"><label>Pain 0–10</label><input type="number" id="pn" min="0" max="10" value="'+(d.pain??"")+'" placeholder="4"></div></div>'+
-    '<div class="field"><label>Mood 1–5</label><input type="number" id="md" min="1" max="5" value="'+(d.mood??"")+'" placeholder="3"></div>'+
+    '<p style="font-size:12px;color:var(--ink-3);margin:-4px 0 12px">Mood has its own tile now — '+
+      '🎭 Mood check, on the capture screen.</p>'+
     '<div class="field"><label>Note</label><textarea id="nt">'+esc(d.note||"")+'</textarea></div>'+
     '<p style="font-size:12px;color:var(--ink-3);margin:0 0 12px">More than 6 hours lights the RECOVER dot automatically. Under that, log a nap of 15 minutes or more.</p>'+
     '<div class="btnrow"><button class="btn ghost" id="cancel">Cancel</button><button class="btn" id="ok">Save check-in</button></div>');
@@ -1540,7 +1671,7 @@ function openCheckin(){
     const k=document.getElementById("d").value; if(!k) return;
     const num=id=>{const v=document.getElementById(id).value; return v===""?undefined:Number(v);};
     const rec=Object.assign({},state.daily[k]||{},{sleepH:num("sh"),eff:num("ef"),rhr:num("hr"),
-      pain:num("pn"),mood:num("md"),note:document.getElementById("nt").value.trim()});
+      pain:num("pn"),note:document.getElementById("nt").value.trim()});
     Object.keys(rec).forEach(x=>rec[x]===undefined&&delete rec[x]);
     state.daily[k]=rec; save(); closeSheet(); renderAll(); toast("Check-in saved");
     celebrateIfStar(k);
@@ -1783,13 +1914,14 @@ function buildCSV(){
   lines.push("");
   lines.push(["Date","Day of week","Phase","Crossed off","REHAB","RECOVER","FUEL","STRENGTH","SPIRITUAL","CARDIO",
     "Dots earned","Dots available","Perfect day","Sleep (h)","Efficiency %","Resting HR","Pain 0-10","Mood 1-5",
-    "Total acetaminophen (mg)","Opioid doses","Note"].map(q).join(","));
+    "Total acetaminophen (mg)","Opioid doses","Mood (1-9)","Mood","Note"].map(q).join(","));
   allDates().forEach(iso=>{
     const st=dayStats(iso), m=dayMeta(iso), d=st.daily;
     const cell=id=> m.dots[id] ? (m.live.includes(id)?"1":"bonus") : "0";
     lines.push([iso,dow(iso),phaseOn(iso).name,m.x?"X":"",cell("green"),cell("blue"),cell("yellow"),
       cell("red"),cell("purple"),cell("orange"),m.earnedLive.length,m.live.length,m.star?"★":"",
-      d.sleepH??"",d.eff??"",d.rhr??"",d.pain??"",d.mood??"",st.apap,Math.round(st.opioid*10)/10,d.note||""].map(q).join(","));
+      d.sleepH??"",d.eff??"",d.rhr??"",d.pain??"",d.mood??"",st.apap,Math.round(st.opioid*10)/10,
+      d.mood9??"",d.mood9!=null?MOOD_BY[d.mood9].k:"",d.note||""].map(q).join(","));
   });
   return lines.join("\r\n");
 }
@@ -1854,6 +1986,20 @@ function renderDash(){
     .sort((a,b)=>a.date<b.date?1:-1)[0];
 
   const asrmAll=asrmEntries(), asrmLast=asrmAll[asrmAll.length-1];
+  const mRange = MOOD_RANGES.find(r=>r.d===state.settings.moodRange) || MOOD_RANGES[1];
+  const mRows  = moodDays(mRange.d), mSeen = mRows.filter(r=>r.v!=null);
+  const mAvg   = mSeen.length ? mSeen.reduce((a,r)=>a+r.v,0)/mSeen.length : null;
+  const mToday = state.daily[iso] && state.daily[iso].mood9!=null ? state.daily[iso].mood9 : null;
+  /* A mode only means something if something actually repeated. With every
+     value seen once the "winner" is just whichever sorted first, which would
+     read as a finding when it is noise. */
+  const mMode  = (()=>{ if(!mSeen.length) return null;
+    const c={}; mSeen.forEach(r=>c[r.v]=(c[r.v]||0)+1);
+    const top = +Object.keys(c).sort((a,b)=>c[b]-c[a]||b-a)[0];
+    const tied = Object.values(c).filter(n=>n===c[top]).length;
+    return (c[top]>1 && tied===1) ? top : null; })();
+  const mLow   = mSeen.filter(r=>r.v<=MOOD_LOW).length;
+  const mHigh  = mSeen.filter(r=>r.v>=MOOD_HIGH).length;
   const asrmBandNow=asrmLast?asrmBand(asrmLast.q):null;
   const d14=lastN(14).map(dayStats), d7=d14.slice(-7);
   const sleepVals=d7.map(x=>x.sleepH).filter(v=>v!=null);
@@ -1937,7 +2083,8 @@ function renderDash(){
       r && r.rhr!=null     ? ['Resting HR',  r.rhr+'<em> bpm</em>'] : null,
       r && r.deepMin!=null ? ['Deep sleep',  r.deepMin+'<em> min</em>'] : null,
       r && r.pain!=null    ? ['Pain',        r.pain+'<em> / 10</em>'] : null,
-      r && r.mood!=null    ? ['Mood',        r.mood+'<em> / 5</em>'] : null,
+      r && r.mood9!=null   ? ['Mood', MOOD_BY[r.mood9].em+'<em> '+esc(MOOD_BY[r.mood9].k)+'</em>']
+        : r && r.mood!=null ? ['Mood', r.mood+'<em> / 5</em>'] : null,
       ['Sleep debt', dbt.observed
          ? (dbt.debt<0 ? Math.abs(dbt.debt)+'<em> h ahead</em>' : dbt.debt+'<em> h</em>')
          : '—'],
@@ -1979,6 +2126,11 @@ function renderDash(){
            (dbt.coverage<0.5?" — too sparse to trust":"")+", vs "+dbt.baseline+" h baseline")
         : "no sleep recorded in the window"},
     {k:"Days over ceiling, 14", v:overDays, s:"/ "+apapDays, d:"days above "+lim.toLocaleString()+" mg"},
+    {k:"Mood today", v:mToday!=null?MOOD_BY[mToday].em:"—", s:mToday!=null?MOOD_BY[mToday].k:"",
+     d: mToday!=null
+        ? mToday+" of 9"+(mToday>=MOOD_HIGH?" — the high end":mToday<=MOOD_LOW?" — the low end":
+                                 mToday===6?" — baseline":"")
+        : "not logged yet — tap 🎭 on the capture screen"},
     {k:"Mania self-rating", v:asrmLast?asrmLast.q:"—", s:asrmLast?"/ "+ASRM_MAX:"",
      d: asrmLast
         ? asrmBandNow.short.toLowerCase()+", taken "+
@@ -2002,6 +2154,21 @@ function renderDash(){
       '<div class="s">Days on which each activity was logged at least once — repeats within a day count once. '+
       'Two Fitness items earn STRENGTH; two Rehab items earn REHAB.</div></figcaption>'+
       '<div class="chartbox">'+activityChart(lastN(30))+'</div></figure></div>'+
+    '<div class="card"><figure><figcaption><div class="t">Mood, last '+esc(mRange.l.toLowerCase())+'</div>'+
+      '<div class="s">One check a day, hopeless at 1 through to hypomanic at 9. Baseline is the '+
+      'middle, so neither end is a target — both are a distance from it, and a stretch spent at '+
+      'either end is the pattern worth catching. Days you did not log are left as gaps.</div></figcaption>'+
+      '<div class="rangerow">'+MOOD_RANGES.map(r=>
+        '<button class="rangebtn'+(r.d===mRange.d?" on":"")+'" data-mr="'+r.d+'">'+esc(r.l)+'</button>').join("")+
+      '</div>'+
+      '<div class="chartbox">'+moodChart(mRows)+'</div>'+
+      '<p class="moodstat">'+
+        '<span>logged <b>'+mSeen.length+'</b> / '+mRange.d+' days</span>'+
+        (mAvg!=null?'<span>average <b>'+(Math.round(mAvg*10)/10)+'</b> / 9</span>':'')+
+        (mMode!=null?'<span>most often <b>'+MOOD_BY[mMode].em+' '+esc(MOOD_BY[mMode].k)+'</b></span>':'')+
+        (mLow?'<span><b>'+mLow+'</b> at the low end</span>':'')+
+        (mHigh?'<span><b>'+mHigh+'</b> at the high end</span>':'')+
+      '</p></figure></div>'+
     (asrmAll.length
       ? '<div class="card"><figure><figcaption><div class="t">Mania self-rating, all scores</div>'+
         '<div class="s">Altman scale, 0–20. Six or more is the published screening threshold — '+
@@ -2032,6 +2199,8 @@ function renderDash(){
     'acetaminophen maximum; clinicians often set 3,000 mg or lower with alcohol, liver concerns, or long courses. '+
     'Confirm yours and set it here.</p>';
   const el=document.getElementById("editLimit"); if(el) el.onclick=openSettings;
+  document.querySelectorAll("#dashBody [data-mr]").forEach(b=> b.onclick=()=>{
+    state.settings.moodRange = +b.dataset.mr; save(); renderDash(); });
   wireHover();
 }
 function trend(now,prev){
@@ -2092,6 +2261,64 @@ function arcGauge(pct){
     (v>0?'<path d="'+arc(start,start+span*v,r)+'" fill="none" stroke="'+
       (gold?"var(--sand)":"var(--accent)")+'" stroke-width="7" stroke-linecap="round"/>':'')+
     '</svg>';
+}
+/* ── MOOD OVER TIME ──
+   One measure, one series, so no legend — the title names it. Both tails are
+   marked rather than just the low one: on this scale 9 is not the goal, and a
+   week spent at the top is the pattern most worth catching early. Gaps are left
+   as gaps; a day with no mood logged is not drawn through. */
+function moodChart(rows){
+  const W=640,H=200,mL=30,mR=12,mT=16,mB=28,iw=W-mL-mR,ih=H-mT-mB;
+  const n=Math.max(rows.length,1);
+  const y=v=>mT+ih-((v-1)/8)*ih, x=i=>mL+(n===1?iw/2:(i/(n-1))*iw);
+  const grid=[1,3,5,7,9].map(v=>'<line x1="'+mL+'" x2="'+(W-mR)+'" y1="'+y(v).toFixed(1)+
+    '" y2="'+y(v).toFixed(1)+'" stroke="var(--grid)" stroke-width="1"/>'+
+    '<text x="'+(mL-7)+'" y="'+(y(v)+3.5).toFixed(1)+'" text-anchor="end" '+
+    'font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+v+'</text>').join("");
+  /* reference bands — status colours, each with a visible label, never colour alone */
+  const bands=
+    '<rect x="'+mL+'" y="'+y(MOOD_LOW).toFixed(1)+'" width="'+iw+'" height="'+(y(1)-y(MOOD_LOW)).toFixed(1)+
+      '" fill="var(--crit)" opacity=".10"/>'+
+    '<rect x="'+mL+'" y="'+mT+'" width="'+iw+'" height="'+(y(MOOD_HIGH)-mT).toFixed(1)+
+      '" fill="var(--warn)" opacity=".10"/>'+
+    '<text x="'+(W-mR-3)+'" y="'+(mT+11)+'" text-anchor="end" font-family="var(--mono)" '+
+      'font-size="9" fill="var(--warn)" stroke="var(--surface)" stroke-width="3" '+
+      'paint-order="stroke" stroke-linejoin="round">elevated</text>'+
+    '<text x="'+(W-mR-3)+'" y="'+(y(1)-4).toFixed(1)+'" text-anchor="end" font-family="var(--mono)" '+
+      'font-size="9" fill="var(--crit)" stroke="var(--surface)" stroke-width="3" '+
+      'paint-order="stroke" stroke-linejoin="round">low</text>';
+  const pts=rows.map((r,i)=>r.v!=null?{i,v:r.v,iso:r.iso}:null).filter(Boolean);
+  if(!pts.length) return '<svg class="chart" viewBox="0 0 '+W+' '+H+'">'+bands+grid+
+    '<text x="'+(W/2)+'" y="'+(H/2+16)+'" text-anchor="middle" font-family="var(--mono)" '+
+    'font-size="11" fill="var(--ink-3)">no moods logged in this window</text></svg>';
+  /* break the line across gaps instead of implying days that were never logged */
+  const segs=[]; let cur=[];
+  pts.forEach(pt=>{ if(cur.length && pt.i!==cur[cur.length-1].i+1){segs.push(cur);cur=[];} cur.push(pt); });
+  segs.push(cur);
+  const line=segs.filter(sg=>sg.length>1).map(sg=>'<polyline points="'+
+    sg.map(pt=>x(pt.i).toFixed(1)+","+y(pt.v).toFixed(1)).join(" ")+
+    '" fill="none" stroke="var(--d-purple)" stroke-width="2" stroke-linejoin="round" '+
+    'stroke-linecap="round"/>').join("");
+  const dense = n>45, r0 = dense?2.6:4.5;
+  const dots=pts.map((pt,k)=>{
+    const last=k===pts.length-1;
+    const col=pt.v>=MOOD_HIGH?"var(--warn)":pt.v<=MOOD_LOW?"var(--crit)":"var(--d-purple)";
+    return '<circle cx="'+x(pt.i).toFixed(1)+'" cy="'+y(pt.v).toFixed(1)+'" r="'+(last?r0+1.5:r0)+
+      '" fill="'+col+'" stroke="var(--surface)" stroke-width="'+(dense?1:2)+'"/>'+
+      '<circle cx="'+x(pt.i).toFixed(1)+'" cy="'+y(pt.v).toFixed(1)+'" r="11" fill="transparent" '+
+      'data-tip="'+esc(shortDate(pt.iso))+'|'+MOOD_BY[pt.v].em+' '+esc(MOOD_BY[pt.v].k)+
+      ' ('+pt.v+'/9)|'+esc(MOOD_BY[pt.v].d)+'"/>'; }).join("");
+  const every=Math.max(1,Math.ceil(n/6));
+  const lab=rows.map((r,i)=>{
+    if(i%every!==0 && i!==n-1) return "";
+    /* the first and last tick would hang off the plot if centred on it */
+    const anchor = i===n-1 ? "end" : i===0 ? "start" : "middle";
+    return '<text x="'+x(i).toFixed(1)+'" y="'+(H-9)+'" text-anchor="'+anchor+
+      '" font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+esc(shortDate(r.iso))+'</text>';
+  }).join("");
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" '+
+    'aria-label="Daily mood on a nine-point scale, with the low and elevated bands marked">'+
+    bands+grid+line+dots+lab+'</svg>';
 }
 /* ── ASRM OVER TIME ──
    Scores are irregular by nature — you take one when you think to — so the
@@ -2433,12 +2660,16 @@ async function encodePayload(obj){
 async function buildShareLink(withNotes){
   const daily={};
   for(const [k,v] of Object.entries(state.daily)){
-    const c=Object.assign({},v); if(!withNotes) delete c.note; daily[k]=c;
+    const c=Object.assign({},v);
+    if(!withNotes){ delete c.note; delete c.mood9; delete c.mood; }
+    daily[k]=c;
   }
   /* A mania screening score goes to the clinical link and not the family one.
-     Family links already strip written notes; a psychiatric screening result
-     belongs in the same category, so those rows are absent rather than hidden. */
-  const ent = withNotes ? state.entries : state.entries.filter(x=>x.id!=="asrm");
+     Family links already strip written notes; a psychiatric screening result and
+     a daily mood log belong in the same category, so those rows are absent
+     rather than hidden. */
+  const ent = withNotes ? state.entries
+            : state.entries.filter(x=>x.id!=="asrm" && x.id!=="mood");
   const payload={
     v:1, mode: withNotes?"clinical":"family", ts: todayISO(),
     e: ent.map(x=>[x.date,x.time,x.id,x.q, withNotes?(x.note||""):""]),
@@ -2457,12 +2688,13 @@ function openShare(){
       '<button class="unitrow" data-share="clinical"><span class="uv">🩺</span>'+
         '<span class="ul"><b>Clinical</b><span>everything, notes included</span></span></button>'+
       '<button class="unitrow" data-share="family"><span class="uv">👨‍👩‍👧</span>'+
-        '<span class="ul"><b>Family</b><span>doses and progress, notes and mania scores removed</span></span></button>'+
+        '<span class="ul"><b>Family</b><span>doses and progress, notes, moods and mania scores removed</span></span></button>'+
     '</div>'+
     '<p style="font-size:12.5px;color:var(--ink-2);margin:14px 0 0">You have '+notes+
     ' entries carrying personal notes — the AAC assessment, the calls with Cassidy and Kate, '+
     'the talks with your parents. The clinical link includes them. The family link builds without them, '+
-    'so they are not in the link at all — and mania self-ratings are left out of the family link entirely.</p>'+
+    'so they are not in the link at all — and mood checks and mania self-ratings are left out of the '+
+    'family link entirely.</p>'+
     '<div class="alert" style="margin-top:13px"><b>Anyone with the link can read it</b>'+
     'The snapshot is inside the link itself, so treat it like the record. Send it directly rather than '+
     'posting it anywhere public, and send a fresh one when you want them to see newer days.</div>'+
