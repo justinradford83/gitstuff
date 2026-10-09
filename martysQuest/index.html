@@ -633,7 +633,7 @@ nav.tabs button.on{color:var(--accent);border-top-color:var(--accent)}
     <h2 class="sec">What did you do?</h2>
     <div class="quickrow" id="stacks"></div>
     <div class="freqwrap" id="freqwrap" hidden>
-      <p class="freqlbl">Most logged · last 14 days</p>
+      <p class="freqlbl">Most logged · not already in a stack</p>
       <div class="freqrow" id="freqrow"></div>
     </div>
     <nav class="jumpbar" id="jumpbar" aria-label="Jump to a section"></nav>
@@ -827,6 +827,8 @@ const GROUPS = [
   {id:"pain",  label:"Pain control",            short:"Pain",     color:"var(--crit)"},
   {id:"sleep", label:"Sleep",                   short:"Sleep",    color:"var(--accent)"},
   {id:"supp",  label:"Vitamins & supplements",  short:"Vitamins", color:"var(--good)"},
+  {id:"fuel",  label:"Fuel",                     short:"Fuel",     color:"var(--d-yellow)",
+   note:"A protein source plus calcium or vitamin D on the same day earns FUEL. Alcohol breaks it."},
   {id:"canna", label:"Other substances",        short:"Other",    color:"var(--warn)"},
   {id:"fit",   label:"Fitness",                 short:"Fitness",  color:"var(--d-red)",
    note:"Any two of these earns STRENGTH. The full rings workout earns it on its own."},
@@ -863,7 +865,7 @@ const CATALOG = [
   {id:"quet100",em:"🌙",   name:"Quetiapine",              common:"Seroquel · Rx Dr Cameron", dose:"100 mg tablets", unit:"mg", q:100, step:50, g:"sleep", fx:"Sleep / mental health"},
   {id:"melat",  em:"🌛",   name:"Melatonin",               common:"gummy", dose:"5 mg", unit:"gummy", q:1, g:"sleep", fx:"Sleep onset"},
   {id:"mag",    em:"🧲",   name:"Magnesium",               common:"bisglycinate", dose:"—", unit:"cap", q:2, g:"sleep", fx:"Sleep / muscle relax"},
-  {id:"winddown",em:"🕯️", name:"Wind-down routine",       common:"phone out, lights down", dose:"—", unit:"", q:1, g:"sleep", fx:"Sleep hygiene"},
+  {id:"winddown",em:"🕯️", name:"Wind-down routine",       common:"phone out, lights down", dose:"—", unit:"", q:1, g:"sleep", fx:"Sleep hygiene", retired:true},
   {id:"quet",   em:"🌙",   name:"Quetiapine",              common:"Seroquel · earlier 25 mg Rx", dose:"25 mg tablets", unit:"mg", q:25, step:25, g:"sleep", fx:"Sleep / mental health", retired:true},
   {id:"gravol", em:"😵‍💫",  name:"Dimenhydrinate",          common:"Gravol", dose:"50 mg", unit:"tab", q:1, g:"sleep", fx:"Sleep aid / nausea", retired:true},
   {id:"sleepez",em:"💤",   name:"Dimenhydrinate gel",      common:"Sleep-EZ", dose:"25 mg", unit:"gel", q:1, g:"sleep", fx:"Sleep aid", retired:true},
@@ -874,9 +876,9 @@ const CATALOG = [
   {id:"omega",  em:"🐟",   name:"Omega-3",                 common:"Fish oil", dose:"—", unit:"cap", q:1, g:"supp", fx:"Anti-inflammatory"},
   {id:"htp",    em:"🧘",   name:"5-HTP",                   common:"—", dose:"—", unit:"cap", q:1, g:"supp", fx:"Mood / sleep"},
   {id:"vitc",   em:"🍊",   name:"Ascorbic acid",           common:"Vitamin C", dose:"—", unit:"cap", q:1, g:"supp", fx:"Vitamin · collagen"},
-  {id:"creat",  em:"💪",   name:"Creatine monohydrate",    common:"—", dose:"10 g", unit:"scoop", q:1, g:"supp", fx:"Muscle retention"},
-  {id:"protein",em:"🥤",   name:"Protein + collagen",      common:"shake", dose:"—", unit:"shake", q:1, g:"supp", fx:"Bone & tissue repair", feeds:"yellow"},
-  {id:"protgoal",em:"🍗",  name:"Protein target hit",      common:"~1.6 g/kg for the day", dose:"—", unit:"", q:1, g:"supp", fx:"Fuel", feeds:"yellow"},
+  {id:"creat",  em:"💪",   name:"Creatine monohydrate",    common:"—", dose:"10 g", unit:"scoop", q:1, g:"fuel", fx:"Muscle retention"},
+  {id:"protein",em:"🥤",   name:"Protein + collagen",      common:"shake", dose:"—", unit:"shake", q:1, g:"fuel", fx:"Bone & tissue repair", feeds:"yellow"},
+  {id:"protgoal",em:"🍗",  name:"Protein target hit",      common:"~1.6 g/kg for the day", dose:"—", unit:"", q:1, g:"fuel", fx:"Fuel", feeds:"yellow"},
 
   {id:"caff",   em:"⚡",   name:"Caffeine",                common:"coffee / energy drink", dose:"—", unit:"serving", q:1, g:"canna", fx:"Stimulant"},
   {id:"alcohol",em:"🍺",   name:"Alcohol",                 common:"breaks the FUEL dot", dose:"—", unit:"drink", q:1, g:"canna", fx:"Depressant", blocks:"yellow"},
@@ -900,7 +902,7 @@ const CATALOG = [
   {id:"gait",   em:"👣",   name:"Gait training",           common:"—", dose:"—", unit:"min", q:10, g:"rehab", fx:"Gait & hip stability"},
   {id:"pool",   em:"🏊",   name:"Swimming",                common:"—", dose:"—", unit:"min", q:30, g:"rehab", fx:"Unloaded conditioning", also:"orange"},
   {id:"wbwalk", em:"🚶",   name:"Weight-bearing walk",     common:"as cleared", dose:"—", unit:"min", q:15, g:"rehab", fx:"Gait & loading"},
-  {id:"crutch", em:"🩼",   name:"Crutch walking",          common:"—", dose:"—", unit:"min", q:10, g:"rehab", fx:"Mobility"},
+  {id:"crutch", em:"🩼",   name:"Crutch walking",          common:"—", dose:"—", unit:"min", q:10, g:"rehab", fx:"Mobility", retired:true},
   {id:"balance",em:"🛹",   name:"Balance board",           common:"—", dose:"—", unit:"min", q:10, g:"rehab", fx:"Proprioception"},
   {id:"ankle",  em:"🦶",   name:"Ankle pumps / quad sets", common:"—", dose:"—", unit:"set", q:3, g:"rehab", fx:"Circulation & activation", retired:true},
   {id:"abduct", em:"🦿",   name:"Hip abduction / glute med",common:"—", dose:"—", unit:"set", q:3, g:"rehab", fx:"Abductor rehab", retired:true},
@@ -920,9 +922,9 @@ const CATALOG = [
   {id:"sleep",  em:"😴",   name:"Sleep",                   common:"total hours last night", dose:"—", unit:"h", q:6, g:"body", fx:"Sleep", step:0.5, sleepTotal:true},
 
   /* ── APPOINTMENTS & WOUND CARE ── */
-  {id:"appt",   em:"🏥",   name:"Medical appointment",     common:"PT · Dr. Laughren · x-ray", dose:"—", unit:"", q:1, g:"care", fx:"Milestone", milestone:true},
+  {id:"appt",   em:"🏥",   name:"Medical appointment",     common:"PT · Dr. Laughren · x-ray", dose:"—", unit:"", q:1, g:"care", fx:"Milestone", milestone:true, retired:true},
   {id:"xray",   em:"🩻",   name:"X-ray / imaging",         common:"union check", dose:"—", unit:"", q:1, g:"care", fx:"Milestone", milestone:true, retired:true},
-  {id:"equip",  em:"🎓",   name:"Equipment graduation",    common:"walker → crutches → cane → none", dose:"—", unit:"", q:1, g:"care", fx:"Milestone", milestone:true},
+  {id:"equip",  em:"🎓",   name:"Equipment graduation",    common:"walker → crutches → cane → none", dose:"—", unit:"", q:1, g:"care", fx:"Milestone", milestone:true, retired:true},
   {id:"wound",  em:"🩹",   name:"Wound & scar care",       common:"—", dose:"—", unit:"", q:1, g:"care", fx:"Wound care", retired:true},
   {id:"shower", em:"🚿",   name:"Shower / self-care",      common:"—", dose:"—", unit:"", q:1, g:"care", fx:"Independence", retired:true},
   {id:"note",   em:"📝",   name:"Journal note",            common:"free text", dose:"—", unit:"", q:1, g:"care", fx:"Note", retired:true},
@@ -1370,13 +1372,19 @@ function showSheet(h){ sheet.innerHTML=h; scrim.classList.add("on"); sheet.class
    opens the same sheet the tile does — it skips the hunt, not the dose field,
    which is not somewhere to save a tap. */
 const FREQ_DAYS = 14, FREQ_MAX = 6;
+/* Anything ANY stack already covers is one tap away at the top of the screen,
+   so repeating it here would spend the row on the items that least need it.
+   The rule is the stacks rather than a list of ids, so adding something to a
+   stack drops it from this row on its own. What is left is the lower half of
+   the page, which is the point of the row. */
+const STACKED = new Set(STACKS.flatMap(st=>st.items.map(([id])=>id)));
 function frequentItems(){
   const from = addDays(todayISO(), -(FREQ_DAYS-1));
   const n = {};
   state.entries.forEach(e=>{
     if(e.date < from) return;
     const c = BY_ID[e.id];
-    if(!c || c.retired) return;
+    if(!c || c.retired || STACKED.has(c.id)) return;
     n[e.id] = (n[e.id]||0) + 1;
   });
   return Object.entries(n)
@@ -1422,11 +1430,44 @@ function chromeHeight(){
    lands as high as it can — fitTail() is what keeps that from happening for
    the last section. */
 const JUMP_GAP = 4;
+let jumping = false;   /* true while a jump is in flight — see spyJumpbar */
+
+/* One estimate is not enough. The bar is sticky, so where it ends up depends
+   on how far the page scrolls: aim at a section near the top and the page may
+   not travel far enough for the bar to stick, leaving it lower than assumed
+   and the heading behind it. That is why jumps looked fine "in sequence" —
+   consecutive sections are a short hop, and a short hop is where the estimate
+   is wrong. So: scroll, wait for it to stop, measure the real gap, correct.
+   The correction is usually zero and never visible. */
 function jumpToSection(id){
   const h = document.getElementById("grp-"+id);
   if(!h) return;
-  const y = h.getBoundingClientRect().top + window.scrollY - chromeHeight() - JUMP_GAP;
-  window.scrollTo({top: Math.max(0, Math.round(y)), behavior: "smooth"});
+  const bar = document.getElementById("jumpbar");
+  const gapNow = () => h.getBoundingClientRect().top -
+                       (bar ? bar.getBoundingClientRect().bottom : chromeHeight()) - JUMP_GAP;
+  jumping = true;
+  window.scrollTo({
+    top: Math.max(0, Math.round(h.getBoundingClientRect().top + window.scrollY
+                                - chromeHeight() - JUMP_GAP)),
+    behavior: "smooth"
+  });
+  /* Wait for the smooth scroll to stop moving, then true it up. Capped so a
+     target the page is too short to reach cannot spin. */
+  let last = null, still = 0, passes = 0;
+  const tick = () => {
+    const y = window.scrollY;
+    if(y === last){
+      if(++still >= 3){
+        const gap = gapNow();
+        if(Math.abs(gap) > 1 && passes++ < 3){
+          window.scrollTo({top: Math.max(0, Math.round(y + gap)), behavior: "auto"});
+          last = null; still = 0;
+        } else { jumping = false; return; }
+      }
+    } else { still = 0; last = y; }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 function fitTail(){
   const host = document.getElementById("catalogGroups");
@@ -1479,10 +1520,15 @@ function spyJumpbar(live){
       b.classList.toggle("on", on);
       if(on) active = b;
     });
-    /* The bar is wider than the screen, so the chip that just lit up may be
-       off to one side. `nearest` moves it only when it is actually out of
-       view, which keeps it from fighting a manual swipe of the bar. */
-    if(active) active.scrollIntoView({inline:"nearest", block:"nearest"});
+    /* Bring the lit chip into view by moving the BAR's own scroll, never
+       scrollIntoView: that one is free to scroll the page as well, and doing
+       so mid-jump hijacks the scroll that is already running. Skipped
+       entirely while a jump is in flight. */
+    if(active && !jumping){
+      const br = bar.getBoundingClientRect(), ar = active.getBoundingClientRect();
+      if(ar.left < br.left)       bar.scrollLeft -= (br.left - ar.left) + 12;
+      else if(ar.right > br.right) bar.scrollLeft += (ar.right - br.right) + 12;
+    }
   }, {rootMargin: (-top)+"px 0px -55% 0px"});
   live.forEach(g=>{ const el=document.getElementById("sec-"+g.id); if(el) jumpSpy.observe(el); });
 }
