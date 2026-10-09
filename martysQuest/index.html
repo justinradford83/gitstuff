@@ -1462,7 +1462,7 @@ function jumpToSection(id){
         if(Math.abs(gap) > 1 && passes++ < 3){
           window.scrollTo({top: Math.max(0, Math.round(y + gap)), behavior: "auto"});
           last = null; still = 0;
-        } else { jumping = false; return; }
+        } else { jumping = false; paintJumpbar(); return; }
       }
     } else { still = 0; last = y; }
     requestAnimationFrame(tick);
@@ -1502,36 +1502,58 @@ function renderJumpbar(){
     b.onclick=()=>jumpToSection(b.dataset.jump));
   spyJumpbar(live);
 }
-/* Highlight the section currently under the bar. Observed rather than measured
-   on scroll, so it costs nothing while the list sits still. */
-let jumpSpy = null;
-function spyJumpbar(live){
-  if(jumpSpy) jumpSpy.disconnect();
-  const bar = document.getElementById("jumpbar");
-  const hdr = document.querySelector("header");
-  const top = (hdr ? hdr.offsetHeight : 56) + (bar ? bar.offsetHeight : 40);
-  const seen = new Set();
-  jumpSpy = new IntersectionObserver(ents=>{
-    ents.forEach(e=> e.isIntersecting ? seen.add(e.target.id) : seen.delete(e.target.id));
-    const first = live.map(g=>"sec-"+g.id).find(id=>seen.has(id));
-    let active = null;
-    bar.querySelectorAll("[data-jump]").forEach(b=>{
-      const on = first === "sec-"+b.dataset.jump;
-      b.classList.toggle("on", on);
-      if(on) active = b;
-    });
-    /* Bring the lit chip into view by moving the BAR's own scroll, never
-       scrollIntoView: that one is free to scroll the page as well, and doing
-       so mid-jump hijacks the scroll that is already running. Skipped
-       entirely while a jump is in flight. */
-    if(active && !jumping){
-      const br = bar.getBoundingClientRect(), ar = active.getBoundingClientRect();
-      if(ar.left < br.left)       bar.scrollLeft -= (br.left - ar.left) + 12;
-      else if(ar.right > br.right) bar.scrollLeft += (ar.right - br.right) + 12;
-    }
-  }, {rootMargin: (-top)+"px 0px -55% 0px"});
-  live.forEach(g=>{ const el=document.getElementById("sec-"+g.id); if(el) jumpSpy.observe(el); });
+/* ── WHICH SECTION AM I LOOKING AT ──
+   The answer is "the last one whose heading has passed under the bar", which
+   is a position test, not an intersection test. The observer version asked
+   which sections overlapped a band near the top and took the first in
+   document order — so a tall section hanging down from above kept winning,
+   and the chip sat one to the left of where you actually were.
+
+   Nine getBoundingClientRect reads on a rAF-throttled scroll is nothing, and
+   it is exactly right rather than nearly right. */
+let spyGroups = [], spyQueued = false;
+function activeSectionId(){
+  if(!spyGroups.length) return null;
+  const edge = chromeHeight() + JUMP_GAP + 2;
+  let cur = spyGroups[0].id;
+  for(const g of spyGroups){
+    const el = document.getElementById("sec-"+g.id);
+    if(!el) continue;
+    if(el.getBoundingClientRect().top <= edge) cur = g.id; else break;
+  }
+  return cur;
 }
+function paintJumpbar(){
+  spyQueued = false;
+  const bar = document.getElementById("jumpbar");
+  if(!bar) return;
+  const id = activeSectionId();
+  let active = null;
+  bar.querySelectorAll("[data-jump]").forEach(b=>{
+    const on = b.dataset.jump === id;
+    b.classList.toggle("on", on);
+    if(on) active = b;
+  });
+  /* Bring the lit chip into view by moving the BAR's own scroll, never
+     scrollIntoView: that one is free to scroll the page as well, and doing so
+     mid-jump hijacks the scroll already running. */
+  if(active && !jumping){
+    const br = bar.getBoundingClientRect(), ar = active.getBoundingClientRect();
+    if(ar.left < br.left)        bar.scrollLeft -= (br.left - ar.left) + 12;
+    else if(ar.right > br.right) bar.scrollLeft += (ar.right - br.right) + 12;
+  }
+}
+function queueJumpbarPaint(){
+  if(spyQueued) return;
+  spyQueued = true;
+  requestAnimationFrame(paintJumpbar);
+}
+function spyJumpbar(live){
+  spyGroups = live;
+  paintJumpbar();
+}
+addEventListener("scroll", queueJumpbarPaint, {passive:true});
+addEventListener("resize", queueJumpbarPaint);
 function renderCatalog(){
   const sw=document.getElementById("stacks");
   sw.innerHTML = STACKS.map(st=>'<button class="quick" data-stack="'+st.id+'"><span>'+st.em+'</span><b>'+esc(st.label)+'</b></button>').join("");
