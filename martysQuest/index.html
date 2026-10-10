@@ -1627,6 +1627,31 @@ function openEntry(c){
     celebrateIfStar(e.date);
   };
 }
+/* Logs a whole stack at one time. Restored: the cut that removed the mania
+   scale took this and openCheckin with it, because both sat between that
+   section's comment and the next section boundary. */
+function openStack(st){
+  showSheet('<h3>'+st.em+' '+esc(st.label)+'</h3><p class="sh-sub">Logs all of these at one time</p>'+
+    '<div class="card" style="margin-bottom:13px;font-size:13.5px;line-height:1.8">'+
+      st.items.map(([id,q])=>BY_ID[id].em+" "+esc(BY_ID[id].name)+" × "+
+        esc(fmtQty(q, BY_ID[id].unit))).join("<br>")+'</div>'+
+    '<div class="row2"><div class="field"><label>Date</label><input type="date" id="d" value="'+todayISO()+'"></div>'+
+    '<div class="field"><label>Time</label><input type="time" id="t" value="'+nowHM()+'"></div></div>'+
+    '<div class="field"><label>Notes</label><textarea id="n"></textarea></div>'+
+    '<div class="btnrow"><button class="btn ghost" id="cancel">Cancel</button>'+
+    '<button class="btn" id="ok">Log '+st.items.length+' items</button></div>');
+  document.getElementById("cancel").onclick=closeSheet;
+  document.getElementById("ok").onclick=()=>{
+    const date=document.getElementById("d").value, time=document.getElementById("t").value;
+    const note=document.getElementById("n").value.trim();
+    if(!date||!time) return;
+    st.items.forEach(([id,q],i)=> state.entries.push({
+      uid:"u"+Date.now()+i+Math.random().toString(36).slice(2,5), date, time, id, q, note:i===0?note:""}));
+    save(); closeSheet(); renderAll(); toast(st.label+" logged");
+    celebrateIfStar(date);
+  };
+}
+
 /* ── THE EVENING NUDGE ──
    After `MOOD_NUDGE_HOUR` local, with today's mood still missing, the capture
    screen leads with the ask. Re-checked on a timer as well as on every render,
