@@ -186,6 +186,105 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     await ctx.close();
   }
 
+  /* ── the strength budget ──────────────────────────────────────────
+     Three rounds earns the dot, from any mix, and each round banks a third.
+     The meter's job is to be right mid-workout, so the fraction, the dot and
+     the undo are all asserted after each tap rather than only at the end. */
+  {
+    const {ctx, page, errs} = await open(browser);
+    const frac = () => page.evaluate(()=>document.querySelector('#strmeter .sm-frac').textContent.trim());
+    const six  = () => page.evaluate(()=>sixthsOn(todayISO()));
+    const red  = () => page.evaluate(()=>!!dayMeta(todayISO()).dots.red);
+    const pips = () => page.evaluate(()=>document.querySelectorAll('#strmeter .sm-bar i.f').length);
+    const tap  = async id => { await page.evaluate(i=>document.querySelector(`#strmeter [data-add="${i}"]`).click(), id);
+                               await page.waitForTimeout(220); };
+
+    check(await frac()==='0 of 1', `empty meter reads "${await frac()}"`);
+    check(await red()===false, 'STRENGTH was earned with nothing logged');
+
+    await tap('kbcombo');
+    check(await six()===2 && await frac()==='⅓ of 1' && await pips()===2,
+      `one kettlebell round banked ${await six()} sixths, meter "${await frac()}", ${await pips()} pips`);
+    check(await red()===false, 'one round earned STRENGTH on its own');
+
+    await tap('rings');
+    check(await six()===4 && await frac()==='⅔ of 1', `two rounds read "${await frac()}"`);
+    check(await red()===false, 'two rounds earned STRENGTH');
+
+    await tap('mace');
+    check(await six()===6 && await frac()==='1', `three rounds read "${await frac()}"`);
+    check(await red()===true, 'three rounds did not earn STRENGTH');
+    check(await page.evaluate(()=>document.getElementById('strmeter').classList.contains('done')),
+      'the meter did not mark the dot as earned');
+
+    /* the mis-tap has to be undoable, or a one-tap log is a trap */
+    await page.evaluate(()=>document.getElementById('smundo').click());
+    await page.waitForTimeout(220);
+    check(await six()===4 && await red()===false, `undo left ${await six()} sixths, dot=${await red()}`);
+    check(await page.evaluate(()=>document.getElementById('smundo').hidden),
+      'undo stayed offered after it was used');
+
+    /* rounds of one lift still add up — the rule is a budget, not a variety bonus */
+    await tap('kbcombo');
+    check(await red()===true, 'a third round of the same lift did not earn STRENGTH');
+    check(errs.length===0, `strength meter page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* push-ups are scored by the rep count, not by the tap */
+    const {ctx, page, errs} = await open(browser);
+    const logPush = async n => {
+      await page.evaluate(()=>document.querySelector('.tile[data-id="pushup"]').click());
+      await page.waitForTimeout(200);
+      await page.fill('#q', String(n));
+      await page.click('#sheet #ok'); await page.waitForTimeout(260);
+    };
+    await logPush(39);
+    check(await page.evaluate(()=>sixthsOn(todayISO()))===1, 'a set under 40 was not worth a sixth');
+    await logPush(40);
+    check(await page.evaluate(()=>sixthsOn(todayISO()))===3, 'a set of 40 was not worth a third');
+    check(await page.evaluate(()=>!!dayMeta(todayISO()).dots.red)===false,
+      '79 push-ups and nothing else earned STRENGTH');
+    check(errs.length===0, `push-up page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* mace rows logged in minutes convert to rounds exactly once */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      raw.entries.push({uid:'mace15', date:todayISO(), time:'09:00', id:'mace', q:15});
+      delete raw.settings.maceRounds;
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    });
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(()=>state.entries.find(e=>e.uid==='mace15').q)===3,
+      'a 15-minute mace row did not convert to 3 rounds');
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(()=>state.entries.find(e=>e.uid==='mace15').q)===3,
+      'the mace conversion ran a second time');
+    check(errs.length===0, `mace migration page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* the past keeps the dots it was earned under — the rule change is not retroactive */
+    const {ctx, page, errs} = await open(browser);
+    const past = await page.evaluate(()=>addDays(todayISO(),-3));
+    await page.evaluate(d=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      /* two distinct Fitness items: a dot under the old rule, worth nothing under the new one */
+      raw.entries.push({uid:'old1', date:d, time:'09:00', id:'hang',   q:10},
+                       {uid:'old2', date:d, time:'10:00', id:'cardio', q:20});
+      delete raw.board[d];
+      raw.settings.dotRulesV2 = true; delete raw.settings.dotRulesV3;
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    }, past);
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(d=>state.board[d] && state.board[d].dots.red === true, past),
+      'a past STRENGTH dot was lost when the rule changed');
+    check(await page.evaluate(d=>sixthsOn(d), past)===0,
+      'the test day was not actually worthless under the new rule');
+    check(errs.length===0, `history freeze page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+
   /* ── the evening nudge ────────────────────────────────────────────── */
   for(const [hour, want] of [[18,false],[19,true],[23,true]]){
     const {ctx, page} = await open(browser, {hour});
@@ -211,9 +310,17 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     for(const [clinical, wantMood, wantNote] of [[true,true,true],[false,false,false]]){
       const link = await page.evaluate(c=>buildShareLink(c), clinical);
       const v = await ctx.newPage();
+      /* the viewer shares whole regions of the app's source, so a helper added
+         on the app side can break it without anything here touching it */
+      const verrs = [];
+      v.on('pageerror', e=>verrs.push(String(e.message)));
+      v.on('console', m=>{ if(m.type()==='error') verrs.push(m.text()); });
       await v.addInitScript(clock(...TODAY));
       await v.goto('file://'+require('path').resolve(__dirname,'..','share.html')+link.slice(link.indexOf('#')));
       await v.waitForTimeout(650);
+      check(verrs.length===0, `${clinical?'clinical':'family'} viewer errors: ${[...new Set(verrs)].join(' | ')}`);
+      check(await v.evaluate(()=>document.body.innerText.length)>200,
+        `${clinical?'clinical':'family'} viewer rendered nothing`);
       const hasMood = await v.evaluate(()=>Object.values(state.daily).some(d=>d.mood9!=null)
         || state.entries.some(e=>e.id==='mood'));
       const hasNote = await v.evaluate(()=>Object.values(state.daily).some(d=>d.note));

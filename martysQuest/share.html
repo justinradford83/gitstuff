@@ -415,6 +415,41 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .moodstat b{font-family:var(--mono);color:var(--ink-2);font-weight:600}
 
 .gnote{font-size:12px;color:var(--ink-3);margin:-6px 0 10px;line-height:1.45;max-width:52ch}
+
+/* ── THE STRENGTH METER ──
+   Sits at the top of the Fitness section, so one tap on the Fitness jump chip
+   puts the whole workout at the top of the screen: what is banked, what is
+   left, and a button per lift that logs a round without opening a sheet. */
+.smeter{border:1px solid var(--line-soft);border-radius:var(--r);background:var(--surface);
+  padding:12px 13px 11px;margin:0 0 12px}
+.smeter.done{border-color:var(--d-red)}
+.sm-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.sm-top b{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:500}
+.sm-frac{font-family:var(--mono);font-size:20px;font-weight:600;line-height:1;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+.smeter.done .sm-frac{color:var(--d-red)}
+.sm-bar{display:flex;gap:3px;margin:10px 0 0}
+.sm-bar i{flex:1;height:7px;border-radius:4px;background:var(--surface-3);
+  border:1px solid var(--line-soft)}
+.sm-bar i.f{background:var(--d-red);border-color:var(--d-red)}
+.sm-bar i.gap{flex:0 0 8px;background:none;border:none}
+.sm-say{font-size:12px;color:var(--ink-3);margin:9px 0 0;line-height:1.45}
+/* wraps rather than scrolls: a button you have to swipe to reach is a button
+   you will not press between sets */
+.sm-row{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 0}
+.sm-row button{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 13px;
+  border-radius:999px;border:1px solid var(--line);background:var(--surface-2);
+  color:var(--ink);font-size:12.5px;cursor:pointer}
+.sm-row button:active{background:var(--surface-3)}
+.sm-row button .se{font-size:16px;line-height:1;font-family:var(--emoji)}
+.sm-row button b{font-weight:500}
+.sm-row button .sc{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);
+  background:var(--surface-3);border-radius:999px;padding:2px 6px;line-height:1.3}
+.sm-undo{display:block;margin:10px 0 0;padding:0;border:none;background:none;cursor:pointer;
+  font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-3);text-decoration:underline}
+.sm-undo[hidden]{display:none}
 .oura{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
 .oura div{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r-sm);
   padding:9px 10px}
@@ -747,8 +782,8 @@ const DOTS = [
    earns:"Protein target hit + calcium/D, and no alcohol.",
    fallback:"One protein shake"},
   {id:"red",   slot:3, letter:"S", name:"STRENGTH",  v:"--d-red",
-   earns:"Any 2 items from the Fitness section — or the full rings workout on its own.",
-   fallback:"One set of rings push-ups"},
+   earns:"Three rounds of strength work, in any mix. A round is a third.",
+   fallback:"One round of rings — a third of the way there"},
   {id:"purple",slot:4, letter:"P", name:"SPIRITUAL", v:"--d-purple",
    earns:"Breathwork, a breath hold, journaling or mental therapy — any one of them.",
    fallback:"Three minutes of box breathing"},
@@ -857,8 +892,7 @@ const GROUPS = [
   {id:"fuel",  label:"Fuel",                     short:"Fuel",     color:"var(--d-yellow)",
    note:"A protein source plus calcium or vitamin D on the same day earns FUEL. Alcohol breaks it."},
   {id:"canna", label:"Other substances",        short:"Other",    color:"var(--warn)"},
-  {id:"fit",   label:"Fitness",                 short:"Fitness",  color:"var(--d-red)",
-   note:"Any two of these earns STRENGTH. The full rings workout earns it on its own."},
+  {id:"fit",   label:"Fitness",                 short:"Fitness",  color:"var(--d-red)"},
   {id:"rehab", label:"Rehab",                   short:"Rehab",    color:"var(--d-green)",
    note:"Any two of these earns REHAB. The PhysiApp programme earns it on its own."},
   {id:"body",  label:"Body & care",             short:"Body",     color:"var(--ink-3)",
@@ -916,10 +950,10 @@ const CATALOG = [
   {id:"preroll",em:"🚬",   name:"Pre-roll",                common:"sativa", dose:"—", unit:"roll", q:1, g:"canna", fx:"Pain / mood", retired:true},
 
   /* ── FITNESS — any two earns STRENGTH; the rings workout earns it alone ── */
-  {id:"rings",  em:"⭕",   name:"Full rings workout",      common:"3× push · 3× dip · 3× row", dose:"—", unit:"round", q:3, g:"fit", fx:"Strength", dot:"red"},
-  {id:"pushup", em:"🫸",   name:"Push-ups",                common:"—", dose:"—", unit:"rep", q:30, step:5, g:"fit", fx:"Upper-body strength"},
+  {id:"rings",  em:"⭕",   name:"Full rings workout",      common:"3× push · 3× dip · 3× row", dose:"—", unit:"round", q:3, g:"fit", fx:"Strength"},
+  {id:"pushup", em:"🫸",   name:"Push-ups",                common:"40+ in a set is a full third", dose:"—", unit:"rep", q:30, step:5, g:"fit", fx:"Upper-body strength"},
   {id:"kbcombo",em:"🔔",   name:"Kettlebell combo",        common:"—", dose:"—", unit:"round", q:2, g:"fit", fx:"Strength & conditioning"},
-  {id:"mace",   em:"🔨",   name:"Mace workout",            common:"—", dose:"—", unit:"min", q:15, g:"fit", fx:"Strength & rotation"},
+  {id:"mace",   em:"🔨",   name:"Mace workout",            common:"—", dose:"—", unit:"round", q:2, g:"fit", fx:"Strength & rotation"},
   {id:"paddle", em:"🛶",   name:"Paddle conditioning",     common:"1-minute rounds", dose:"—", unit:"round", q:3, g:"fit", fx:"Surf-specific cardio", also:"orange"},
   {id:"hang",   em:"🧗",   name:"Hangboard training",      common:"—", dose:"—", unit:"min", q:10, g:"fit", fx:"Grip & upper body"},
   {id:"popup",  em:"🏄",   name:"Surf pop-up training",    common:"floor → board → water", dose:"—", unit:"reps", q:10, g:"fit", fx:"Surf-specific"},
@@ -966,6 +1000,31 @@ const CATALOG = [
 ];
 const BY_ID = Object.fromEntries(CATALOG.map(c=>[c.id,c]));
 const FIT_IDS   = new Set(CATALOG.filter(c=>c.g==="fit").map(c=>c.id));
+/* ── THE STRENGTH BUDGET ──
+   STRENGTH is a rounds budget, not a checklist of distinct items. Three
+   rounds earns it, in any mix: a round of kettlebell, rings or mace is a
+   third, 40 or more push-ups in a set is a third, and a shorter set is half
+   of one. Counted in sixths so the arithmetic stays whole-number — a short
+   push-up set is the only thing that lands on a half-third, and sixths let
+   the meter draw it. */
+const STRENGTH_ROUND_IDS = ["kbcombo","rings","mace"];
+const ROUND_IDS  = new Set(STRENGTH_ROUND_IDS);
+const PUSHUP_FULL = 40;        /* reps for a whole third */
+const THIRD = 2, STRENGTH_SIXTHS = 6;
+function rowSixths(e){
+  if(ROUND_IDS.has(e.id)) return Math.round(e.q * THIRD);
+  if(e.id === "pushup")   return e.q >= PUSHUP_FULL ? THIRD : (e.q > 0 ? 1 : 0);
+  return 0;
+}
+function strengthSixths(rows){ return rows.reduce((a,e)=>a+rowSixths(e), 0); }
+function sixthsOn(iso){ return strengthSixths(state.entries.filter(e=>e.date===iso)); }
+/* ⅙ ⅓ ½ ⅔ ⅚ — real glyphs, so the meter reads as a fraction and not a score */
+const SIXTH_GLYPH = ["","⅙","⅓","½","⅔","⅚"];
+function fracSixths(n){
+  if(n <= 0) return "0";
+  const w = Math.floor(n/6), r = n%6;
+  return (w?String(w):"") + (r?SIXTH_GLYPH[r]:"");
+}
 const REHAB_IDS = new Set(CATALOG.filter(c=>c.g==="rehab").map(c=>c.id));
 
 const STACKS = [
@@ -1104,7 +1163,7 @@ function apapLevel(mg){ const l=state.settings.apapLimit;
 /* ── DOT DERIVATION ──
    auto  = earned by what you logged
    man   = manually forced on/off (overrides auto) */
-function autoDots(iso){
+function autoDots(iso, legacy){
   const st = dayStats(iso);
   const ids = new Set(st.rows.map(e=>e.id));
   const out = {};
@@ -1113,13 +1172,15 @@ function autoDots(iso){
     if(c.dot)  out[c.dot]=true;
     if(c.also) out[c.also]=true;
   });
-  /* REHAB and STRENGTH are counting rules over their capture sections: two
-     DISTINCT items in a section earns its dot. Logging the same thing twice
-     is not two items. The rings workout is the single exception — it carries
-     STRENGTH on its own through the `dot` tag above. */
+  /* REHAB is a counting rule over its capture section: two DISTINCT items
+     earns the dot, and logging the same thing twice is not two items. */
   const count = set => [...ids].filter(x=>set.has(x)).length;
   if(count(REHAB_IDS) >= 2) out.green = true;
-  if(count(FIT_IDS)   >= 2) out.red   = true;
+  /* STRENGTH is a rounds budget instead — three thirds, from any mix of the
+     round-based lifts. `legacy` replays the old distinct-items rule, and is
+     passed only by the history freeze below. */
+  if(legacy ? (count(FIT_IDS) >= 2 || ids.has("rings"))
+            : strengthSixths(st.rows) >= STRENGTH_SIXTHS) out.red = true;
   /* RECOVER: more than 6 h of sleep, or a nap of 15 minutes or more. */
   const napMin = st.rows.filter(e=>e.id==="nap").reduce((a,e)=>a+e.q,0);
   if((st.sleepH != null && st.sleepH > 6) || napMin >= 15) out.blue = true;
@@ -1158,23 +1219,32 @@ function legacyAutoDots(iso){
   if(ids.has("alcohol")) out.yellow = false;
   return out;
 }
-function freezeHistory(){
-  if(state.settings.dotRulesV2) return;
+function freezeDotsThrough(flag, derive){
+  if(state.settings[flag]) return 0;
   const today = todayISO();
   const days = new Set([...state.entries.map(e=>e.date),
                         ...Object.keys(state.daily), ...Object.keys(state.board)]);
   let frozen = 0;
   [...days].filter(d => d < today).forEach(iso => {
-    const auto = legacyAutoDots(iso);
+    const auto = derive(iso);
     const man  = (state.board[iso] && state.board[iso].dots) || {};
     const dots = {};
     DOTS.forEach(d => { dots[d.id] = (d.id in man) ? !!man[d.id] : !!auto[d.id]; });
     state.board[iso] = Object.assign({}, state.board[iso], {dots, starShown:true});
     frozen++;
   });
-  state.settings.dotRulesV2 = true;
+  state.settings[flag] = true;
   save();
   return frozen;
+}
+function freezeHistory(){
+  const a = freezeDotsThrough("dotRulesV2", legacyAutoDots);
+  /* The strength rule became a rounds budget on the day this version shipped.
+     Same reasoning as the first freeze: every day before today keeps the dots
+     it had under the distinct-items rule, so the board he has been filling in
+     since August still reads the way he earned it. */
+  const b = freezeDotsThrough("dotRulesV3", iso => autoDots(iso, true));
+  return a + b;
 }
 /* ── THE GOLD STAR MOMENT ──
    Fires once per day, at the instant the last required dot lands. `starShown`
@@ -1421,17 +1491,17 @@ function breathBest(days){
 }
 
 /* ── STRENGTH ──
-   Bar height is how many distinct Fitness items were done that day. Two is
-   where the STRENGTH dot lands, so anything shorter than that is drawn back:
-   the chart shows effort, the solid bars show the days that counted. */
+   Bar height is what the day's rounds were worth, in thirds. Three is where
+   the dot lands, so anything shorter is drawn back: the chart shows the work,
+   the solid bars show the days that counted. */
 function strengthDays(days){
   const out = [], t = todayISO(), n = days || Math.max(1, daysBetween(INJURY,t)+1);
   for(let i=n-1;i>=0;i--){
     const iso = addDays(t,-i);
-    const ids = new Set(state.entries.filter(e=>e.date===iso && FIT_IDS.has(e.id)).map(e=>e.id));
+    const thirds = Math.round(sixthsOn(iso)/2*10)/10;
     const earned = dayMeta(iso).dots.red;
-    out.push({iso, v: ids.size || null, dim: !earned,
-              note: earned ? "STRENGTH earned" : (ids.size?"short of the dot":"")});
+    out.push({iso, v: thirds || null, dim: !earned,
+              note: earned ? "STRENGTH earned" : (thirds?"short of the dot":"")});
   }
   return out;
 }
