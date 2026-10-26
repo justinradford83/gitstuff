@@ -224,6 +224,12 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(await page.evaluate(()=>document.getElementById('smundo').hidden),
       'undo stayed offered after it was used');
 
+    /* a round of pop-ups is a third like any other round */
+    await tap('popup');
+    check(await six()===6 && await red()===true, 'a pop-up round did not count as a third');
+    await page.evaluate(()=>document.getElementById('smundo').click());
+    await page.waitForTimeout(220);
+
     /* rounds of one lift still add up — the rule is a budget, not a variety bonus */
     await tap('kbcombo');
     check(await red()===true, 'a third round of the same lift did not earn STRENGTH');
@@ -245,6 +251,31 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(await page.evaluate(()=>!!dayMeta(todayISO()).dots.red)===false,
       '79 push-ups and nothing else earned STRENGTH');
     check(errs.length===0, `push-up page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* pop-up rows logged as reps convert to rounds of ten */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      raw.entries.push({uid:'pu30', date:todayISO(), time:'09:00', id:'popup', q:30});
+      delete raw.settings.popupRounds;
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    });
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(()=>state.entries.find(e=>e.uid==='pu30').q)===3,
+      '30 pop-ups did not convert to 3 rounds');
+    check(await page.evaluate(()=>!!dayMeta(todayISO()).dots.red), '3 pop-up rounds did not earn STRENGTH');
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(()=>state.entries.find(e=>e.uid==='pu30').q)===3,
+      'the pop-up conversion ran a second time');
+    check(errs.length===0, `pop-up migration page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* the hangboard is retired: gone from the grid, still readable in the ledger */
+    const {ctx, page} = await open(browser);
+    check(await page.evaluate(()=>!document.querySelector('.tile[data-id="hang"]')),
+      'the retired hangboard tile is still on the capture screen');
+    check(await page.evaluate(()=>!!BY_ID.hang), 'the hangboard fell out of the catalog entirely');
     await ctx.close();
   }
   { /* mace rows logged in minutes convert to rounds exactly once */

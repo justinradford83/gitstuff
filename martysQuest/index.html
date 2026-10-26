@@ -815,7 +815,7 @@ const PHASES = [
   {id:"build", em:"🧱", name:"BUILD", from:"2026-09-01", to:"2026-10-31",
    live:["green","blue","yellow","red","purple"],
    job:"Rebuild the base. Progressive loading, restore normal gait, re-establish paddle fitness.",
-   detail:"Strength enters as the main event: rings, mace, hangboard, progressive resistance, early single-leg work. Train the right leg hard too — cross-education helps preserve neural drive to the injured side. Rehab shifts from protection to correction: gait retraining, hip stability, killing any Trendelenburg lurch before it becomes permanent. CARDIO can be earned here but is not yet required for a gold star.",
+   detail:"Strength enters as the main event: rings, mace, pop-ups, progressive resistance, early single-leg work. Train the right leg hard too — cross-education helps preserve neural drive to the injured side. Rehab shifts from protection to correction: gait retraining, hip stability, killing any Trendelenburg lurch before it becomes permanent. CARDIO can be earned here but is not yet required for a gold star.",
    why:"The plateau lives here. Somewhere in October you will be walking normally, not in pain, and improvement will slow to nearly imperceptible. That is the Plateau of Latent Potential, and it is exactly when abductor rehab gets abandoned. Five or six blank squares in a row is not laziness — it is the plateau, and the board is what tells you while there is still time to correct.",
    ms:["Unassisted walking","Symmetrical gait, no Trendelenburg lurch","Bodyweight squat to parallel",
        "Off codeine entirely","Paddle fitness re-started",
@@ -959,8 +959,8 @@ const CATALOG = [
   {id:"kbcombo",em:"🔔",   name:"Kettlebell combo",        common:"—", dose:"—", unit:"round", q:2, g:"fit", fx:"Strength & conditioning"},
   {id:"mace",   em:"🔨",   name:"Mace workout",            common:"—", dose:"—", unit:"round", q:2, g:"fit", fx:"Strength & rotation"},
   {id:"paddle", em:"🛶",   name:"Paddle conditioning",     common:"1-minute rounds", dose:"—", unit:"round", q:3, g:"fit", fx:"Surf-specific cardio", also:"orange"},
-  {id:"hang",   em:"🧗",   name:"Hangboard training",      common:"—", dose:"—", unit:"min", q:10, g:"fit", fx:"Grip & upper body"},
-  {id:"popup",  em:"🏄",   name:"Surf pop-up training",    common:"floor → board → water", dose:"—", unit:"reps", q:10, g:"fit", fx:"Surf-specific"},
+  {id:"hang",   em:"🧗",   name:"Hangboard training",      common:"—", dose:"—", unit:"min", q:10, g:"fit", fx:"Grip & upper body", retired:true},
+  {id:"popup",  em:"🏄",   name:"Surf pop-up training",    common:"10 pop-ups to a round · floor → board → water", dose:"—", unit:"round", q:1, g:"fit", fx:"Surf-specific strength"},
   {id:"cardio", em:"🫀",   name:"Cardio",                  common:"wheelchair · walking · bike", dose:"—", unit:"min", q:20, g:"fit", fx:"Aerobic base", also:"orange"},
 
   /* ── REHAB — any two earns REHAB ── */
@@ -1011,7 +1011,7 @@ const FIT_IDS   = new Set(CATALOG.filter(c=>c.g==="fit").map(c=>c.id));
    of one. Counted in sixths so the arithmetic stays whole-number — a short
    push-up set is the only thing that lands on a half-third, and sixths let
    the meter draw it. */
-const STRENGTH_ROUND_IDS = ["kbcombo","rings","mace"];
+const STRENGTH_ROUND_IDS = ["kbcombo","rings","mace","popup"];
 const ROUND_IDS  = new Set(STRENGTH_ROUND_IDS);
 const PUSHUP_FULL = 40;        /* reps for a whole third */
 const THIRD = 2, STRENGTH_SIXTHS = 6;
@@ -1168,6 +1168,13 @@ function migrate(o){
      — five dots' worth — on the strength chart. Five minutes to a round is an
      estimate, which is safe here: the days those rows belong to had their dots
      frozen above, so nothing on the board moves. Runs once. */
+  /* Pop-ups were logged as individual reps and are now logged in rounds of
+     ten. Same reasoning as the mace conversion below, and the same safety:
+     the days those rows sit on were frozen before the rule changed. */
+  if(!o.settings.popupRounds){
+    o.entries.forEach(e=>{ if(e.id==="popup") e.q = Math.max(1, Math.round(e.q/10)); });
+    o.settings.popupRounds = true;
+  }
   if(!o.settings.maceRounds){
     o.entries.forEach(e=>{ if(e.id==="mace") e.q = Math.max(1, Math.round(e.q/5)); });
     o.settings.maceRounds = true;
@@ -1795,7 +1802,9 @@ function openEntry(c){
       ?'<div class="alert" style="border-color:'+dotVar("red")+';background:transparent;color:'+dotVar("red")+';margin:0 0 14px"><b>Counts toward STRENGTH</b>'+
         (c.id==="pushup"
           ? PUSHUP_FULL+' reps or more is a third of the dot; a shorter set is a sixth.'
-          : 'Each round is a third of the dot. Three rounds, in any mix, earns it.')+
+          : (c.id==="popup"
+              ? 'Ten pop-ups is a round, and each round is a third of the dot.'
+              : 'Each round is a third of the dot. Three rounds, in any mix, earns it.'))+
         ' '+fracSixths(sixthsOn(todayISO()))+' banked today.</div>':'')+
     (c.unit?'<div class="field"><label>Quantity ('+esc(c.unit)+')</label><div class="stepper">'+
       '<button type="button" id="minus">−</button><input type="number" id="q" value="'+c.q+'" min="0">'+
@@ -2312,8 +2321,8 @@ function renderDash(){
     chart: dayBars(stRows, {unit:"", step:1, color:"var(--d-red)",
                             label:"Strength work per day, in thirds of the dot"}),
     note: "Bar height is the day\u2019s strength work in thirds — a round of kettlebell, "+
-      "rings or mace counts as one, and so does a set of "+PUSHUP_FULL+"+ push-ups. Three "+
-      "earns STRENGTH, so solid bars are the days that counted and faded ones fell short"+
+      "rings, mace or pop-ups counts as one, and so does a set of "+PUSHUP_FULL+"+ push-ups. "+
+      "Three earns STRENGTH, so solid bars are the days that counted and faded ones fell short"+
       (stAny>stDone ? " — "+(stAny-stDone)+" of them in this window." : ".")
   });
 
