@@ -10,7 +10,14 @@
  * that shipped twice — openCheckin and openStack were both deleted by a cut
  * that named neither. "Does this control respond" has to be asserted.
  */
-const PW = process.env.PW_MODULE || 'playwright-core';
+/* playwright-core may not be installed next to this file; the remote container
+   keeps one under /opt. */
+const PW = process.env.PW_MODULE || (() => {
+  for(const m of ['playwright-core', '/opt/node-tools/node_modules/playwright-core']){
+    try { require.resolve(m); return m; } catch {}
+  }
+  throw new Error('no playwright-core found \u2014 set PW_MODULE to one');
+})();
 /* The bundled browser's build number rarely matches whatever playwright-core
    was installed last, so find a real binary rather than trusting the default. */
 const CHROME = process.env.PW_CHROMIUM || (() => {
