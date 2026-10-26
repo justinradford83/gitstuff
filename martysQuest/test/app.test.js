@@ -217,6 +217,60 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     await ctx.close();
   }
 
+  /* ── the dashboard's metric cards ─────────────────────────────────── */
+  {
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>{ const t=todayISO();
+      [[1,95],[1,52],[5,78],[7,112],[14,55],[18,118],[24,122]].forEach(([d,sec],i)=>
+        state.entries.push({uid:'bh'+i, date:addDays(t,-d), time:'08:00', id:'breathhold', q:sec}));
+      [['rings'],['mace','hang'],['cardio'],['rings','paddle','mace']].forEach((items,i)=>
+        items.forEach((id,j)=>state.entries.push({uid:'ft'+i+j, date:addDays(t,-(i*3)), time:'10:00', id, q:1})));
+      save(); renderAll(); });
+    await page.click('nav.tabs button[data-tab="dash"]');
+    await page.waitForTimeout(350);
+    /* the acute-phase readouts are gone */
+    const txt = await page.evaluate(()=>document.getElementById('dashBody').innerText);
+    for(const stale of ['Acetaminophen today','Opioid-free','Last acetaminophen','Days over ceiling'])
+      check(!txt.includes(stale), `dashboard still shows "${stale}"`);
+    check(!await page.evaluate(()=>!!document.querySelector('#dashBody svg[aria-label*="acetaminophen"]')),
+      'the acetaminophen chart is still on the dashboard');
+    /* both cards render with numbers and bars */
+    const cards = await page.evaluate(()=>[...document.querySelectorAll('#dashBody .mcard')].map(c=>({
+      title:c.querySelector('h3').textContent,
+      stats:c.querySelectorAll('.mstat').length,
+      bars:c.querySelectorAll('svg rect[rx]').length })));
+    check(cards.length===2, `expected 2 metric cards, got ${cards.length}`);
+    for(const c of cards){
+      check(c.stats===2, `${c.title} card has ${c.stats} headline stats`);
+      check(c.bars>0,   `${c.title} card drew no bars`);
+    }
+    /* each range switch changes the window and is remembered */
+    for(const key of ['bh','str']){
+      for(const d of [7,30,90,0]){
+        await page.click(`#dashBody [data-${key}="${d}"]`);
+        await page.waitForTimeout(170);
+        const lit = await page.evaluate(k=>{
+          const c=[...document.querySelectorAll('.mcard')].find(x=>x.querySelector(`[data-${k}]`));
+          return c.querySelector('.seg button.on').dataset[k]; }, key);
+        check(lit===String(d), `${key} range ${d}: lit chip says ${lit}`);
+      }
+    }
+    check(await page.evaluate(()=>state.settings.bhRange)===0 &&
+          await page.evaluate(()=>state.settings.strRange)===0, 'card ranges were not remembered');
+    /* the ceiling guard stays quiet until the day actually runs at it */
+    for(const [tabs, want] of [[0,false],[4,false],[7,true],[9,true]]){
+      await page.evaluate(n=>{ const t=todayISO();
+        state.entries = state.entries.filter(e=>!(e.date===t && e.id==='apap'));
+        if(n) state.entries.push({uid:'ap', date:t, time:'09:00', id:'apap', q:n});
+        save(); renderDash(); }, tabs);
+      await page.waitForTimeout(140);
+      const shown = await page.evaluate(()=>!!document.querySelector('.apapwarn'));
+      check(shown===want, `at ${tabs*500} mg the ceiling warning was ${shown?'shown':'hidden'}`);
+    }
+    check(errs.length===0, `dashboard page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+
   /* ── storage key: changing it orphans the record on the phone ─────── */
   {
     const {ctx, page} = await open(browser);

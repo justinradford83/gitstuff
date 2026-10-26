@@ -339,6 +339,37 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
    The chip for the section you are looking at highlights itself, so the bar
    doubles as "where am I" — which is the half of the problem scrolling does
    not solve. */
+/* ── METRIC CARD ──
+   Header, two headline stats, a segmented range, then the bars. One shape
+   reused per metric so the cards read as one instrument, not several. */
+.mcard{background:var(--surface);border:1px solid var(--line-soft);
+  border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
+.mcard .mhd{display:flex;align-items:center;gap:11px;margin:0 0 14px}
+.mcard .mhd i{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--accent-soft);
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-style:normal;
+  font-family:var(--emoji)}
+.mcard .mhd h3{font-family:var(--serif);font-size:18.5px;font-weight:600;margin:0;flex:1;line-height:1.2}
+.mstats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+.mstat{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);
+  padding:14px 10px;text-align:center}
+.mstat span{display:block;font-size:11.5px;color:var(--ink-3);margin:0 0 8px;line-height:1.25}
+.mstat b{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.mstat b small{font-size:13px;color:var(--ink-3);font-weight:400;letter-spacing:0}
+.seg{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line-soft);
+  border-radius:999px;padding:3px;margin:0 0 13px}
+.seg button{flex:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  padding:8px 4px;border-radius:999px;border:0;background:none;color:var(--ink-3);cursor:pointer;
+  white-space:nowrap}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.mavg{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--accent);background:var(--accent-soft);
+  border-radius:999px;padding:5px 11px;margin:0 0 4px}
+.mnote{font-size:11.5px;color:var(--ink-3);margin:11px 0 0;line-height:1.45}
+.apapwarn{border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);
+  border-radius:var(--r);padding:13px 14px;margin:0 0 14px;font-size:13px;line-height:1.45}
+.apapwarn b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;margin:0 0 4px}
 .jumpbar{position:sticky;top:var(--hdr,56px);z-index:30;display:flex;gap:6px;overflow-x:auto;
   scrollbar-width:none;margin:0 calc(var(--pad) * -1) 14px;padding:8px var(--pad);
   background:color-mix(in srgb,var(--ground) 92%,transparent);
@@ -666,7 +697,7 @@ nav.tabs button.on{color:var(--accent);border-top-color:var(--accent)}
   <section class="screen" id="s-dash">
     <p class="eyebrow">Dashboard</p>
     <h2 class="sec" id="dashDate">Today</h2>
-    <p class="sub">The number that matters most sits on top: total acetaminophen from every source.</p>
+    <p class="sub">Where the training is actually going. Tap a range on any card to change its window.</p>
     <div class="stack" id="dashBody"></div>
   </section>
 
@@ -1066,6 +1097,8 @@ function migrate(o){
   o.settings.baselineNeed ??= 6.5;   /* keep in step with sleepdebt/config.yaml */
   o.settings.debtWindow  ??= 14;
   o.settings.moodRange   ??= 30;
+  o.settings.bhRange     ??= 30;
+  o.settings.strRange    ??= 30;
   /* Sections used to fold. They no longer do, so anything left folded would
      be permanently invisible — clear the stored state rather than orphan it. */
   delete o.settings.folded; delete o.settings.foldInit;
@@ -2071,6 +2104,45 @@ function renderDash(){
   const staleDays = ln ? daysBetween(ln.iso, iso) : null;
   const nightOf = i => shortDate(addDays(i,-1))+" → "+shortDate(i);
 
+  /* ── breath hold ── */
+  const bhR    = pickRange("bhRange", 30), bhDays = rangeDays(bhR);
+  const bhAll  = breathHolds(bhDays), bhRows = breathBest(bhDays);
+  const bhBest = bhAll.length ? Math.max(...bhAll.map(e=>e.q)) : null;
+  const bhAvg  = bhAll.length ? Math.round(bhAll.reduce((a,e)=>a+e.q,0)/bhAll.length) : null;
+  const bhLogged = bhRows.filter(r=>r.v).length;
+  const bhPerDay = bhLogged ? Math.round(bhRows.reduce((a,r)=>a+(r.v||0),0)/bhLogged) : null;
+  const breathCard = metricCard({
+    em:"🫁", title:"Breath hold", key:"bh", ranges:CARD_RANGES, range:bhR,
+    stats:[{k:"Average hold", v:bhAvg!=null?bhAvg:"—", s:bhAvg!=null?"s":""},
+           {k:"Longest hold", v:bhBest!=null?bhBest:"—", s:bhBest!=null?"s":""}],
+    avg: bhPerDay!=null ? "avg "+bhPerDay+" sec/day" : null,
+    chart: dayBars(bhRows, {unit:"s", color:"var(--accent)", label:"Longest breath hold per day"}),
+    note: bhAll.length
+      ? bhAll.length+" hold"+(bhAll.length===1?"":"s")+" over "+bhLogged+" day"+(bhLogged===1?"":"s")+
+        ". Bars are each day's longest; the average counts every hold."
+      : "Nothing logged yet — tap 🫁 Breath hold on the capture screen."
+  });
+
+  /* ── strength ── */
+  const stR   = pickRange("strRange", 30), stDays = rangeDays(stR);
+  const stRows = strengthDays(stDays);
+  const stDone = stRows.filter(r=>!r.dim && r.v).length;
+  const stAny  = stRows.filter(r=>r.v).length;
+  const stRate = Math.round(stDone/stDays*7*10)/10;
+  const stStreak = (()=>{ let n=0; for(let i=stRows.length-1;i>=0;i--){
+    if(!stRows[i].dim && stRows[i].v) n++; else if(i<stRows.length-1) break; } return n; })();
+  const strengthCard = metricCard({
+    em:"🏋️", title:"Strength", key:"str", ranges:CARD_RANGES, range:stR,
+    stats:[{k:"Days earned", v:stDone, s:"/ "+stDays},
+           {k:"Per week", v:stRate.toFixed(1), s:"days"}],
+    avg: stDone ? stRate.toFixed(1)+" days/week" : null,
+    chart: dayBars(stRows, {unit:"", step:1, color:"var(--d-red)",
+                            label:"Fitness items logged per day"}),
+    note: "Bar height is how many Fitness items you did that day. Two earns STRENGTH, so "+
+      "solid bars are the days that counted and faded ones fell short"+
+      (stAny>stDone ? " — "+(stAny-stDone)+" of them in this window." : ".")
+  });
+
   /* ── the ring row ── */
   const dayPct  = meta.live.length ? meta.earnedLive.length/meta.live.length : 0;
   const phDays  = Math.max(1, daysBetween(ph.from, ph.to));
@@ -2080,7 +2152,7 @@ function renderDash(){
     {v:ln&&staleDays===0?(Math.round(ln.sleepH*10)/10):"—", u:ln&&staleDays===0?"h":"", l:"Sleep",
      p:ln&&staleDays===0?ln.sleepH/9:0, c:"var(--d-blue)"},
     {v:stars.streak, u:"", l:"Star streak", p:stars.streak/7, c:"var(--sand)"},
-    {v:Math.round(pct), u:"%", l:"Tylenol", p:pct/100, c:col},
+    {v:stDone, u:"", l:"Strength", p:stDone/Math.max(1,stDays/7*3), c:"var(--d-red)"},
     {v:Math.round(phPct*100), u:"%", l:ph.name.charAt(0)+ph.name.slice(1).toLowerCase(), p:phPct, c:"var(--d-purple)"}
   ];
   const ringRow='<div class="ringrow">'+rings.map(r=>
@@ -2174,9 +2246,10 @@ function renderDash(){
     {k:"To Hawaii", v:remaining().value, s:remaining().unit.id, d:longDate(GOAL)+", 2027"},
     {k:"Dots this week", v:dots7, s:"/ "+avail7, d:avail7?Math.round(dots7/avail7*100)+"% of what was available":"—"},
     {k:"Dot streak", v:dotStreak(), s:"days", d:"consecutive days with at least one dot"},
-    {k:"Opioid-free", v:lastOpioid?daysBetween(lastOpioid.date,iso):"—", s:lastOpioid?"days":"",
-     d:lastOpioid?"last dose "+longDate(lastOpioid.date):"none ever logged"},
-    {k:"Last acetaminophen", v:lA?clock(lA.mins):"—", s:"", d:"4 h between doses is the usual floor"},
+    {k:"Breath hold, best", v:bhBest!=null?bhBest:"—", s:bhBest!=null?"s":"",
+     d:bhAvg!=null?"averaging "+bhAvg+" s over "+bhAll.length+" holds":"nothing logged yet"},
+    {k:"Rehab days, 30", v:lastN(30).filter(d=>d>=INJURY&&dayMeta(d).dots.green).length, s:"/ 30",
+     d:"days the REHAB dot was earned"},
     {k:"Avg sleep, 7 days", v:avg7!=null?avg7.toFixed(1):"—", s:avg7!=null?"h":"",
      d:avg7!=null?(avg7>6?"above the 6 h RECOVER line":"under the 6 h RECOVER line"):"nothing logged"},
     {k:"Sleep debt, "+dbt.windowDays+" days",
@@ -2185,7 +2258,6 @@ function renderDash(){
         ? (dbt.observed+" of "+dbt.windowDays+" nights recorded"+
            (dbt.coverage<0.5?" — too sparse to trust":"")+", vs "+dbt.baseline+" h baseline")
         : "no sleep recorded in the window"},
-    {k:"Days over ceiling, 14", v:overDays, s:"/ "+apapDays, d:"days above "+lim.toLocaleString()+" mg"},
     {k:"Mood today", v:mToday!=null?MOOD_BY[mToday].em:"—", s:mToday!=null?MOOD_BY[mToday].k:"",
      d: mToday!=null
         ? mToday+" of 9"+(mToday>=MOOD_HIGH?" — the high end":mToday<=MOOD_LOW?" — the low end":
@@ -2194,14 +2266,17 @@ function renderDash(){
   ];
 
   document.getElementById("dashBody").innerHTML=
-    ringRow + focus + starCard + sleepCard +
-    '<div class="hero"><span class="lbl">Acetaminophen today · all sources</span>'+
-      '<div class="big" style="color:'+col+'">'+st.apap.toLocaleString()+
-        ' <span class="of">/ '+lim.toLocaleString()+' mg</span></div>'+
-      '<div class="meter"><i style="width:'+pct+'%;background:'+col+'"></i><span class="tick" style="left:75%"></span></div>'+
-      '<p class="note">'+esc(verdict)+' Counts plain Tylenol at '+state.settings.apapTab+
-      ' mg a tablet plus 300 mg in every Tylenol No. 3. '+(st.codeine?'Codeine today: '+st.codeine+' mg. ':'')+
-      '<button class="del" id="editLimit" style="opacity:1;color:var(--accent);font-size:12px;font-family:var(--mono)">edit strengths</button></p></div>'+
+    ringRow + focus + starCard + breathCard + strengthCard + sleepCard +
+    /* The daily acetaminophen readout is gone — that was the acute phase. The
+       ceiling itself is not: it only surfaces on a day that actually runs at
+       it, so it costs nothing on the days it has nothing to say. */
+    (st.apap >= lim*0.75
+      ? '<div class="apapwarn"><b>'+(st.apap>lim?'Over the ceiling':'Near the ceiling')+'</b>'+
+        st.apap.toLocaleString()+' mg of acetaminophen today against a '+lim.toLocaleString()+
+        ' mg limit. '+esc(verdict)+
+        ' <button class="del" id="editLimit" style="opacity:1;color:inherit;font-size:12px;'+
+        'font-family:var(--mono);text-decoration:underline">edit strengths</button></div>'
+      : '')+
     '<div class="tiles">'+tiles.map(t=>'<div class="stat"><span class="k">'+esc(t.k)+'</span>'+
       '<div class="v">'+esc(String(t.v))+(t.s?' <small>'+esc(t.s)+'</small>':'')+'</div>'+
       '<div class="d">'+esc(t.d)+'</div></div>').join("")+'</div>'+
@@ -2232,13 +2307,6 @@ function renderDash(){
     '<div class="card"><figure><figcaption><div class="t">Sleep, 14 days</div>'+
       '<div class="s">More than 6 hours earns RECOVER. Bone healing happens largely in slow-wave sleep.</div></figcaption>'+
       '<div class="chartbox">'+sleepChart(d14)+'</div></figure></div>'+
-    '<div class="card"><figure><figcaption><div class="t">Daily acetaminophen, 14 days</div>'+
-      '<div class="s">Dashed line is your '+lim.toLocaleString()+' mg ceiling</div></figcaption>'+
-      '<div class="chartbox">'+apapChart(d14,lim)+'</div>'+
-      '<div class="legend"><span><i style="background:var(--good)"></i>Under 75% of ceiling</span>'+
-      '<span><i style="background:var(--warn)"></i>75–100%</span>'+
-      '<span><i style="background:var(--crit)"></i>Over ceiling</span>'+
-      '<span><i class="ln"></i>Ceiling</span></div></figure></div>'+
     '<div class="card"><span class="lbl mono" style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)">Current phase</span>'+
       '<h3 style="font-family:var(--serif);font-size:19px;margin:6px 0 3px;font-weight:600">'+ph.em+' '+esc(ph.name)+'</h3>'+
       '<p style="margin:0 0 10px;font-size:13px;color:var(--ink-2)">'+esc(ph.job)+'</p>'+
@@ -2250,6 +2318,10 @@ function renderDash(){
   const el=document.getElementById("editLimit"); if(el) el.onclick=openSettings;
   document.querySelectorAll("#dashBody [data-mr]").forEach(b=> b.onclick=()=>{
     state.settings.moodRange = +b.dataset.mr; save(); renderDash(); });
+  document.querySelectorAll("#dashBody [data-bh]").forEach(b=> b.onclick=()=>{
+    state.settings.bhRange = +b.dataset.bh; save(); renderDash(); });
+  document.querySelectorAll("#dashBody [data-str]").forEach(b=> b.onclick=()=>{
+    state.settings.strRange = +b.dataset.str; save(); renderDash(); });
   wireHover();
 }
 function trend(now,prev){
@@ -2310,6 +2382,117 @@ function arcGauge(pct){
     (v>0?'<path d="'+arc(start,start+span*v,r)+'" fill="none" stroke="'+
       (gold?"var(--sand)":"var(--accent)")+'" stroke-width="7" stroke-linecap="round"/>':'')+
     '</svg>';
+}
+/* ── DAILY BARS ──
+   One pill per day, a gap where nothing was logged. Days are plotted at their
+   real position rather than packed together, so a fortnight off reads as a
+   fortnight off instead of two bars side by side.
+   `rows` is [{iso, v, dim}] — dim draws the bar back for a day that counted
+   for something but did not clear the bar's own threshold. */
+function dayBars(rows, opts){
+  const o = Object.assign({unit:"", color:"var(--accent)", step:null}, opts||{});
+  const W=640, H=190, mL=42, mR=10, mT=14, mB=28, iw=W-mL-mR, ih=H-mT-mB;
+  const n = Math.max(rows.length, 1);
+  const vals = rows.map(r=>r.v).filter(v=>v!=null && v>0);
+  if(!vals.length) return '<svg class="chart" viewBox="0 0 '+W+' '+H+'">'+
+    '<text x="'+(W/2)+'" y="'+(H/2)+'" text-anchor="middle" font-family="var(--mono)" '+
+    'font-size="11" fill="var(--ink-3)">nothing logged in this window</text></svg>';
+  const top = Math.max(...vals);
+  /* round the ceiling up to a readable step so the gridlines land on round numbers */
+  /* aim for three or four gridlines: halving the top value rounds the ceiling
+     so far up that the tallest bar only reaches the middle of the plot */
+  const stepFor = m => { const raw = m/3;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1,2,2.5,5,10].map(x=>x*pow).find(x=>x>=raw) || pow*10; };
+  const step = o.step || stepFor(top);
+  const max  = Math.max(step, Math.ceil(top/step)*step);
+  const y = v => mT + ih - (v/max)*ih;
+  const x = i => mL + (i + 0.5) * (iw/n);
+  const ticks = []; for(let v=0; v<=max; v+=step) ticks.push(v);
+  const grid = ticks.map(v=>'<line x1="'+mL+'" x2="'+(W-mR)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+
+    '" stroke="var(--grid)" stroke-width="1"/><text x="'+(mL-8)+'" y="'+(y(v)+3.5).toFixed(1)+
+    '" text-anchor="end" font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+
+    (Math.round(v*10)/10)+esc(o.unit)+'</text>').join("");
+  const bw = Math.max(4, Math.min(11, (iw/n) * 0.5));
+  const bars = rows.map((r,i)=>{
+    if(r.v==null || r.v<=0) return "";
+    const h = Math.max(bw, mT+ih - y(r.v));   /* never shorter than its own cap */
+    return '<rect x="'+(x(i)-bw/2).toFixed(1)+'" y="'+(mT+ih-h).toFixed(1)+'" width="'+bw.toFixed(1)+
+      '" height="'+h.toFixed(1)+'" rx="'+(bw/2).toFixed(1)+'" fill="'+o.color+'"'+
+      (r.dim?' opacity=".38"':'')+'/>';
+  }).join("");
+  const hits = rows.map((r,i)=>'<rect x="'+(x(i)-(iw/n)/2).toFixed(1)+'" y="'+mT+'" width="'+
+    (iw/n).toFixed(1)+'" height="'+ih+'" fill="transparent" data-tip="'+esc(shortDate(r.iso))+'|'+
+    (r.v==null||r.v<=0 ? '—' : esc(String(Math.round(r.v*10)/10)+o.unit))+'|'+esc(r.note||"")+'"/>').join("");
+  const every = Math.max(1, Math.ceil(n/8));
+  /* The last tick is always drawn. Drop the regular one before it unless a
+     whole interval separates them, or the two labels overlap — and never drop
+     it when it IS the last tick. */
+  const lastRegular = Math.floor((n-1)/every)*every;
+  const skip = (lastRegular !== n-1 && (n-1) - lastRegular < every) ? lastRegular : -1;
+  const lab = rows.map((r,i)=>{
+    if(i===skip) return "";
+    if(i%every!==0 && i!==n-1) return "";
+    const anchor = i===n-1 ? "end" : i===0 ? "start" : "middle";
+    return '<text x="'+x(i).toFixed(1)+'" y="'+(H-9)+'" text-anchor="'+anchor+
+      '" font-family="var(--mono)" font-size="9" fill="var(--ink-3)">'+
+      esc(n>45 ? shortDate(r.iso) : String(parseISO(r.iso).getDate()))+'</text>';
+  }).join("");
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+
+    esc(o.label||"Daily values")+'">'+grid+bars+lab+hits+'</svg>';
+}
+/* The shared card shape: icon, title, two headline numbers, range, bars. */
+function metricCard(o){
+  return '<div class="mcard">'+
+    '<div class="mhd"><i>'+o.em+'</i><h3>'+esc(o.title)+'</h3></div>'+
+    '<div class="mstats">'+o.stats.map(st=>
+      '<div class="mstat"><span>'+esc(st.k)+'</span><b>'+esc(String(st.v))+
+      (st.s?'<small> '+esc(st.s)+'</small>':'')+'</b></div>').join("")+'</div>'+
+    '<div class="seg">'+o.ranges.map(r=>
+      '<button data-'+o.key+'="'+r.d+'"'+(r.d===o.range.d?' class="on"':'')+'>'+esc(r.l)+'</button>').join("")+
+    '</div>'+
+    (o.avg?'<span class="mavg">'+esc(o.avg)+'</span>':'')+
+    '<div class="chartbox">'+o.chart+'</div>'+
+    (o.note?'<p class="mnote">'+esc(o.note)+'</p>':'')+
+  '</div>';
+}
+const CARD_RANGES = [{d:7,l:"Week"},{d:30,l:"Month"},{d:90,l:"90 days"},{d:0,l:"All"}];
+function rangeDays(r){ return r.d || Math.max(1, daysBetween(INJURY, todayISO())+1); }
+function pickRange(key, fallback){
+  return CARD_RANGES.find(r=>r.d===state.settings[key]) || CARD_RANGES.find(r=>r.d===fallback);
+}
+
+/* ── BREATH HOLD ──
+   One bar a day, the longest hold of that day. Averages count every hold, not
+   just the day's best, so a day of short practice holds pulls the average
+   down the way it should. */
+function breathHolds(days){
+  const from = days ? addDays(todayISO(), -(days-1)) : INJURY;
+  return state.entries.filter(e=>e.id==="breathhold" && e.date>=from && e.q>0);
+}
+function breathBest(days){
+  const by = {};
+  breathHolds(days).forEach(e=>{ by[e.date] = Math.max(by[e.date]||0, e.q); });
+  const out = [], t = todayISO(), n = days || Math.max(1, daysBetween(INJURY,t)+1);
+  for(let i=n-1;i>=0;i--){ const iso = addDays(t,-i);
+    out.push({iso, v: by[iso]||null, note: by[iso]?"best of the day":""}); }
+  return out;
+}
+
+/* ── STRENGTH ──
+   Bar height is how many distinct Fitness items were done that day. Two is
+   where the STRENGTH dot lands, so anything shorter than that is drawn back:
+   the chart shows effort, the solid bars show the days that counted. */
+function strengthDays(days){
+  const out = [], t = todayISO(), n = days || Math.max(1, daysBetween(INJURY,t)+1);
+  for(let i=n-1;i>=0;i--){
+    const iso = addDays(t,-i);
+    const ids = new Set(state.entries.filter(e=>e.date===iso && FIT_IDS.has(e.id)).map(e=>e.id));
+    const earned = dayMeta(iso).dots.red;
+    out.push({iso, v: ids.size || null, dim: !earned,
+              note: earned ? "STRENGTH earned" : (ids.size?"short of the dot":"")});
+  }
+  return out;
 }
 /* ── MOOD OVER TIME ──
    One measure, one series, so no legend — the title names it. Both tails are
