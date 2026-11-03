@@ -253,6 +253,49 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(errs.length===0, `push-up page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
+  { /* the weight-bearing walk earns CARDIO, and says so on the tile */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>document.querySelector('.tile[data-id="wbwalk"]').click());
+    await page.waitForTimeout(220);
+    check(await page.evaluate(()=>document.querySelector('#sheet .alert b').textContent)==='Earns a dot',
+      'the walk sheet does not say it earns a dot');
+    check(await page.evaluate(()=>document.querySelector('#sheet .alert').textContent.includes('CARDIO')),
+      'the walk sheet does not name CARDIO');
+    await page.click('#sheet #ok'); await page.waitForTimeout(280);
+    check(await page.evaluate(()=>!!dayMeta(todayISO()).dots.orange), 'the walk did not earn CARDIO');
+    check(await page.evaluate(()=>
+      document.querySelectorAll('.tile[data-id="wbwalk"] .earnrow .earns').length)===1,
+      'the walk tile shows no dot pip');
+    /* two pips on one tile must sit side by side rather than on top of each other */
+    const pips = await page.evaluate(()=>{
+      const t=document.querySelector('.tile[data-id="wbwalk"]');
+      t.querySelector('.earnrow').insertAdjacentHTML('beforeend','<i class="earns" style="background:red"></i>');
+      const r=[...t.querySelectorAll('.earns')].map(e=>e.getBoundingClientRect());
+      return r[0].right <= r[1].left + 0.5 || r[1].right <= r[0].left + 0.5;
+    });
+    check(pips, 'two dot pips on one tile overlap');
+    check(errs.length===0, `walk page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* a past day does not gain a star it never had */
+    const {ctx, page, errs} = await open(browser);
+    const past = await page.evaluate(()=>addDays(todayISO(),-2));
+    await page.evaluate(d=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      raw.entries.push({uid:'w1', date:d, time:'09:00', id:'wbwalk', q:15});
+      delete raw.board[d];
+      raw.settings.dotRulesV2 = true; raw.settings.dotRulesV3 = true;
+      delete raw.settings.dotRulesV4;
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    }, past);
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(d=>state.board[d].dots.orange===false, past),
+      'a past walk was granted CARDIO retroactively');
+    check(await page.evaluate(d=>!!autoDots(d).orange, past),
+      'the test day would not have gained CARDIO without the freeze');
+    check(errs.length===0, `walk freeze page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
   { /* pop-up rows logged as reps convert to rounds of ten */
     const {ctx, page, errs} = await open(browser);
     await page.evaluate(()=>{
