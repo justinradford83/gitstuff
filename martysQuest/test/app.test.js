@@ -253,6 +253,24 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(errs.length===0, `push-up page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
+  { /* gait symmetry moved from BUILD to LOAD, carrying any tick with it */
+    const {ctx, page, errs} = await open(browser);
+    const MS = 'Symmetrical gait, no Trendelenburg lurch';
+    check(await page.evaluate(m=>{
+      const b=PHASES.find(p=>p.id==='build'), l=PHASES.find(p=>p.id==='load');
+      return !b.ms.includes(m) && l.ms.includes(m);
+    }, MS), 'the gait milestone is not under LOAD');
+    await page.evaluate(m=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      raw.done['build|'+m] = true;
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    }, MS);
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(m=>state.done['load|'+m]===true && !('build|'+m in state.done), MS),
+      'a ticked gait milestone did not follow the move');
+    check(errs.length===0, `plan page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
   { /* the weight-bearing walk earns CARDIO, and says so on the tile */
     const {ctx, page, errs} = await open(browser);
     await page.evaluate(()=>document.querySelector('.tile[data-id="wbwalk"]').click());
