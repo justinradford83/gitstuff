@@ -295,6 +295,32 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(errs.length===0, `mobility page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
+  { /* three distinct mobility drills in a day earns REHAB, across sessions */
+    const {ctx, page, errs} = await open(browser);
+    const session = async ids => {
+      await page.evaluate(()=>document.querySelector('.tile[data-id="mobility"]').click());
+      await page.waitForTimeout(200);
+      for(const id of ids) await page.click(`#sheet .pickrow[data-mv="${id}"]`);
+      await page.click('#sheet #ok'); await page.waitForTimeout(280);
+    };
+    const green = () => page.evaluate(()=>!!dayMeta(todayISO()).dots.green);
+    await session(['yoga','crab']);
+    check(await green()===false, 'two drills earned REHAB');
+    await session(['yoga','crab']);
+    check(await green()===false, 'repeating the same two drills earned REHAB');
+    await session(['khip']);
+    check(await green()===true, 'a third distinct drill in a second session did not earn REHAB');
+    await ctx.close();
+    const two = await open(browser);
+    await two.page.evaluate(()=>document.querySelector('.tile[data-id="mobility"]').click());
+    await two.page.waitForTimeout(200);
+    for(const id of ['e90s','ypush','f2h']) await two.page.click(`#sheet .pickrow[data-mv="${id}"]`);
+    await two.page.click('#sheet #ok'); await two.page.waitForTimeout(280);
+    check(await two.page.evaluate(()=>!!dayMeta(todayISO()).dots.green), 'three drills in one session did not earn REHAB');
+    check(errs.length===0 && two.errs.length===0,
+      `mobility REHAB page errors: ${[...new Set([...errs,...two.errs])].join(' | ')}`);
+    await two.ctx.close();
+  }
   { /* a session logged under the old crab label reads correctly after the rename */
     const {ctx, page, errs} = await open(browser);
     await page.evaluate(()=>{

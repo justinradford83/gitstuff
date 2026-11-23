@@ -792,7 +792,7 @@ const KEY    = "mq_recovery_v3";
    prescribed programmes in themselves: the rings workout and the PhysiApp set. */
 const DOTS = [
   {id:"green", slot:0, letter:"R", name:"REHAB",     v:"--d-green",
-   earns:"Any 2 items from the Rehab section — or the PhysiApp programme on its own.",
+   earns:"Any 2 items from the Rehab section — or the PhysiApp programme, or 3 mobility drills, on its own.",
    fallback:"Gait training plus two minutes on the balance board"},
   {id:"blue",  slot:1, letter:"Z", name:"RECOVER",   v:"--d-blue",
    earns:"More than 6 hours of sleep — or a nap of 15 minutes or more.",
@@ -915,6 +915,10 @@ const MOBILITY = [
   {id:"khip",  k:"Kneeling hip thrusts"}
 ];
 const MOBILITY_BY = Object.fromEntries(MOBILITY.map(m=>[m.id,m]));
+const MOBILITY_FOR_REHAB = 3;
+function mobilityDrills(rows){
+  return new Set(rows.filter(e=>e.id==="mobility").flatMap(e=>e.sel||[])).size;
+}
 
 const GROUPS = [
   {id:"mind",  label:"Mental health",           short:"Mind",     color:"var(--d-purple)",
@@ -927,7 +931,7 @@ const GROUPS = [
   {id:"canna", label:"Other substances",        short:"Other",    color:"var(--warn)"},
   {id:"fit",   label:"Fitness",                 short:"Fitness",  color:"var(--d-red)"},
   {id:"rehab", label:"Rehab",                   short:"Rehab",    color:"var(--d-green)",
-   note:"Any two of these earns REHAB. The PhysiApp programme earns it on its own."},
+   note:"Any two of these earns REHAB. The PhysiApp programme, or three mobility drills, earns it on its own."},
   {id:"body",  label:"Body & care",             short:"Body",     color:"var(--ink-3)",
    note:"Sleep over 6 h, or a 15-minute nap, earns RECOVER. Breathwork, a breath hold, journalling or mental therapy earns SPIRITUAL."},
   {id:"care",  label:"Appointments",             short:"Appts",    color:"var(--sand)"},
@@ -1340,6 +1344,9 @@ function autoDots(iso, legacy){
      earns the dot, and logging the same thing twice is not two items. */
   const count = set => [...ids].filter(x=>set.has(x)).length;
   if(count(REHAB_IDS) >= 2) out.green = true;
+  /* Three DISTINCT mobility drills in a day earns REHAB on its own, whether
+     they came in one session or several. Repeating a drill is not a new one. */
+  if(mobilityDrills(st.rows) >= MOBILITY_FOR_REHAB) out.green = true;
   /* STRENGTH is a rounds budget instead — three thirds, from any mix of the
      round-based lifts. `legacy` replays the old distinct-items rule, and is
      passed only by the history freeze below. */
@@ -2021,7 +2028,7 @@ function openMobility(){
   const c = BY_ID.mobility;
   const picked = new Set();
   showSheet('<h3>'+c.em+' '+esc(c.name)+'</h3>'+
-    '<p class="sh-sub">Tap everything you did — any number of them</p>'+
+    '<p class="sh-sub">Tap everything you did · '+MOBILITY_FOR_REHAB+' different drills in a day earns REHAB</p>'+
     '<div class="picklist" role="group" aria-label="Movements">'+MOBILITY.map(m=>
       '<button type="button" class="pickrow" data-mv="'+m.id+'" aria-pressed="false">'+
         '<i class="pb"></i><span class="pk">'+esc(m.k)+'</span></button>').join("")+'</div>'+
