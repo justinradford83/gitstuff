@@ -253,6 +253,19 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(errs.length===0, `push-up page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
+  { /* the morning stack hands over the right dose — a wrong number here is a
+       wrong number of tablets, so the row it writes is checked, not the list */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>document.querySelector('[data-stack="morn"]').click());
+    await page.waitForTimeout(220);
+    await page.click('#sheet #ok'); await page.waitForTimeout(300);
+    const lamo = await page.evaluate(()=>state.entries.filter(e=>e.date===todayISO() && e.id==='lamo'));
+    check(lamo.length===1 && lamo[0].q===2, `the morning stack logged ${JSON.stringify(lamo.map(e=>e.q))} lamotrigine`);
+    check(await page.evaluate(()=>['vitd','htp','omega','vitc'].every(id =>
+      state.entries.some(e=>e.date===todayISO() && e.id===id))), 'the morning stack dropped a vitamin');
+    check(errs.length===0, `morning stack page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
   { /* gait symmetry moved from BUILD to LOAD, carrying any tick with it */
     const {ctx, page, errs} = await open(browser);
     const MS = 'Symmetrical gait, no Trendelenburg lurch';
