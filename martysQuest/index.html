@@ -911,7 +911,8 @@ const MOBILITY = [
   {id:"e90s",  k:"Elevated 90s"},
   {id:"ypush", k:"Yoga push-ups"},
   {id:"f2h",   k:"Push-up, foot to hand"},
-  {id:"crab",  k:"Crab hop thrusts"}
+  {id:"crab",  k:"Crab hip thrusts"},
+  {id:"khip",  k:"Kneeling hip thrusts"}
 ];
 const MOBILITY_BY = Object.fromEntries(MOBILITY.map(m=>[m.id,m]));
 
@@ -1205,6 +1206,11 @@ function migrate(o){
   /* Pop-ups were logged as individual reps and are now logged in rounds of
      ten. Same reasoning as the mace conversion below, and the same safety:
      the days those rows sit on were frozen before the rule changed. */
+  /* "Crab hop thrusts" was a misreading of crab HIP thrusts. The id never
+     changed, so `sel` was always right; only the label written into the note
+     was wrong. Replacing it is idempotent, so no flag is needed. */
+  o.entries.forEach(e=>{ if(e.id==="mobility" && e.note)
+    e.note = e.note.replace("Crab hop thrusts", "Crab hip thrusts"); });
   if(!o.settings.popupRounds){
     o.entries.forEach(e=>{ if(e.id==="popup") e.q = Math.max(1, Math.round(e.q/10)); });
     o.settings.popupRounds = true;

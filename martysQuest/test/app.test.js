@@ -257,8 +257,8 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     const {ctx, page, errs} = await open(browser);
     await page.evaluate(()=>document.querySelector('.tile[data-id="mobility"]').click());
     await page.waitForTimeout(220);
-    check(await page.evaluate(()=>document.querySelectorAll('#sheet .pickrow').length)===5,
-      'the mobility sheet is not five movements');
+    check(await page.evaluate(()=>document.querySelectorAll('#sheet .pickrow').length)===6,
+      'the mobility sheet is not six movements');
     check(await page.evaluate(()=>document.getElementById('ok').disabled),
       'the mobility sheet could be saved with nothing picked');
     /* more than one, and tapping twice takes it back off again */
@@ -278,10 +278,10 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     /* catalog order, not tap order */
     check(row && JSON.stringify(row.sel)===JSON.stringify(['yoga','crab']),
       `the movement ids read ${JSON.stringify(row&&row.sel)}`);
-    check(row && row.note==='Standard yoga · Crab hop thrusts', `the note reads "${row&&row.note}"`);
-    check(await page.evaluate(()=>document.getElementById('ledger').innerText.includes('Crab hop thrusts'))
+    check(row && row.note==='Standard yoga · Crab hip thrusts', `the note reads "${row&&row.note}"`);
+    check(await page.evaluate(()=>document.getElementById('ledger').innerText.includes('Crab hip thrusts'))
       || await page.evaluate(()=>{document.querySelector('nav.tabs [data-tab="table"]').click();
-           return document.getElementById('ledger').innerText.includes('Crab hop thrusts');}),
+           return document.getElementById('ledger').innerText.includes('Crab hip thrusts');}),
       'the ledger does not show which movements were done');
     /* one session is one REHAB item, not two */
     check(await page.evaluate(()=>!dayMeta(todayISO()).dots.green),
@@ -293,6 +293,20 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(await page.evaluate(()=>!!dayMeta(todayISO()).dots.green),
       'mobility plus gait training did not earn REHAB');
     check(errs.length===0, `mobility page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* a session logged under the old crab label reads correctly after the rename */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>{
+      const raw = JSON.parse(localStorage.getItem('mq_recovery_v3'));
+      raw.entries.push({uid:'mob0', date:todayISO(), time:'08:00', id:'mobility', q:2,
+        sel:['yoga','crab'], note:'felt good — Standard yoga · Crab hop thrusts'});
+      localStorage.setItem('mq_recovery_v3', JSON.stringify(raw));
+    });
+    await page.reload(); await page.waitForTimeout(450);
+    check(await page.evaluate(()=>state.entries.find(e=>e.uid==='mob0').note)===
+      'felt good — Standard yoga · Crab hip thrusts', 'an old crab session kept the wrong label');
+    check(errs.length===0, `crab rename page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
   { /* the morning stack hands over the right dose — a wrong number here is a
