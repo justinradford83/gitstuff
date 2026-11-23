@@ -401,6 +401,20 @@ textarea{resize:vertical;min-height:60px;font-size:14px}
 .moodtile[aria-checked="true"]{border-color:var(--d-purple);background:var(--surface-3);color:var(--ink);
   box-shadow:inset 0 0 0 1px var(--d-purple)}
 .moodtile[aria-checked="true"] .mv{color:var(--d-purple)}
+/* a checklist, not a grid of tiles: the names are too long to read small and
+   the order of the list is the order of the session */
+.picklist{display:flex;flex-direction:column;gap:6px;margin:0 0 14px}
+.pickrow{display:flex;align-items:center;gap:11px;padding:12px 13px;text-align:left;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);
+  color:var(--ink-2);font:inherit;font-size:13.5px;cursor:pointer}
+.pickrow .pb{flex:0 0 auto;width:18px;height:18px;border-radius:5px;
+  border:1.5px solid var(--line);background:var(--surface)}
+.pickrow[aria-pressed="true"]{border-color:var(--d-green);background:var(--surface-3);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--d-green)}
+.pickrow[aria-pressed="true"] .pb{background:var(--d-green);border-color:var(--d-green);
+  position:relative}
+.pickrow[aria-pressed="true"] .pb::after{content:"";position:absolute;left:5px;top:1.5px;
+  width:5px;height:10px;border:solid var(--surface);border-width:0 2px 2px 0;transform:rotate(42deg)}
 .moodsay{border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin:0 0 14px;
   background:var(--surface-2);display:flex;gap:11px;align-items:center;min-height:62px}
 .moodsay .se{font-size:28px;line-height:1;font-family:var(--emoji)}
@@ -889,6 +903,18 @@ function moodDays(days){
 const MOOD_RANGES = [{d:7,  l:"Week"}, {d:30, l:"Month"}, {d:90, l:"90 days"}];
 
 /* ════════ CATALOG ════════ */
+/* The mobility session is one logged thing made of several movements, so the
+   movements live here rather than as tiles of their own: one row in the
+   ledger, one item towards REHAB, and a record of which drills it was. */
+const MOBILITY = [
+  {id:"yoga",  k:"Standard yoga"},
+  {id:"e90s",  k:"Elevated 90s"},
+  {id:"ypush", k:"Yoga push-ups"},
+  {id:"f2h",   k:"Push-up, foot to hand"},
+  {id:"crab",  k:"Crab hop thrusts"}
+];
+const MOBILITY_BY = Object.fromEntries(MOBILITY.map(m=>[m.id,m]));
+
 const GROUPS = [
   {id:"mind",  label:"Mental health",           short:"Mind",     color:"var(--d-purple)",
    note:"A mood check earns SPIRITUAL."},
@@ -969,6 +995,7 @@ const CATALOG = [
   {id:"physiapp",em:"📱",  name:"PhysiApp exercises",      common:"the prescribed programme", dose:"—", unit:"session", q:1, g:"rehab", fx:"Prescribed rehab", dot:"green"},
   {id:"physio", em:"🧑‍⚕️", name:"Physiotherapy",           common:"session", dose:"—", unit:"session", q:1, g:"rehab", fx:"Rehab"},
   {id:"mobil",  em:"🤸",   name:"Hip / knee ROM",          common:"range of motion work", dose:"—", unit:"min", q:15, g:"rehab", fx:"Range of motion", retired:true},
+  {id:"mobility",em:"🦎",  name:"Mobility movements",      common:"yoga · 90s · crab hops", dose:"—", unit:"movement", q:1, g:"rehab", fx:"Mobility & control", movePick:true},
   {id:"gait",   em:"👣",   name:"Gait training",           common:"—", dose:"—", unit:"min", q:10, g:"rehab", fx:"Gait & hip stability"},
   {id:"pool",   em:"🏊",   name:"Swimming",                common:"—", dose:"—", unit:"min", q:30, g:"rehab", fx:"Unloaded conditioning", also:"orange"},
   {id:"wbwalk", em:"🚶",   name:"Weight-bearing walk",     common:"as cleared", dose:"—", unit:"min", q:15, g:"rehab", fx:"Gait & loading", also:"orange"},
@@ -1224,7 +1251,7 @@ function h12(hm){ const [H,M]=hm.split(":").map(Number); const ap=H<12?"am":"pm"
 function timeOfDay(hm){ const H=Number(hm.split(":")[0]);
   return H<5?"Overnight":H<8?"Early morning":H<12?"Morning":H<17?"Afternoon":H<21?"Evening":"Night"; }
 function fmtQty(q,unit){ const n=(Math.round(q*100)/100).toString();
-  return unit ? n+" "+unit+(q!==1 && unit.length>2 && unit.length<7 && !unit.endsWith("s")?"s":"") : n; }
+  return unit ? n+" "+unit+(q!==1 && unit.length>2 && unit.length<12 && !unit.endsWith("s")?"s":"") : n; }
 function esc(x){ return String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("on");
   clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
@@ -1813,6 +1840,7 @@ function renderCatalog(){
 }
 function openEntry(c){
   if(c.moodPick) return openMood();
+  if(c.movePick) return openMobility();
   const isAct = ["rehab","fit","body","care"].includes(c.g);
   showSheet(
     '<h3>'+c.em+' '+esc(c.name)+'</h3>'+
@@ -1973,6 +2001,58 @@ function openMood(){
     state.daily[date] = Object.assign({}, state.daily[date]||{}, {mood9:pick});
     save(); closeSheet(); renderAll();
     toast(m.em+" "+m.k+" logged · SPIRITUAL dot earned");
+    celebrateIfStar(date);
+  };
+}
+
+/* A mobility session is a handful of drills done together, so the sheet is a
+   checklist rather than a quantity: tap what you did, and the count is the
+   quantity. The movements go into the note the way the mood check writes its
+   label, so the ledger reads back as the session it was, and into `sel` as
+   ids, so a later question like "how often do I actually do crab hops" is
+   answerable from the record rather than from parsed prose. */
+function openMobility(){
+  const c = BY_ID.mobility;
+  const picked = new Set();
+  showSheet('<h3>'+c.em+' '+esc(c.name)+'</h3>'+
+    '<p class="sh-sub">Tap everything you did — any number of them</p>'+
+    '<div class="picklist" role="group" aria-label="Movements">'+MOBILITY.map(m=>
+      '<button type="button" class="pickrow" data-mv="'+m.id+'" aria-pressed="false">'+
+        '<i class="pb"></i><span class="pk">'+esc(m.k)+'</span></button>').join("")+'</div>'+
+    '<div class="row2"><div class="field"><label>Date</label>'+
+      '<input type="date" id="d" value="'+todayISO()+'"></div>'+
+      '<div class="field"><label>Time</label><input type="time" id="t" value="'+nowHM()+'"></div></div>'+
+    '<div class="field"><label>Notes</label><textarea id="n" placeholder="'+
+      'How did it move? Anything stiff, anything that gave way"></textarea></div>'+
+    '<div class="btnrow"><button class="btn ghost" id="cancel">Cancel</button>'+
+      '<button class="btn" id="ok" disabled>Log it</button></div>');
+
+  function paint(){
+    sheet.querySelectorAll(".pickrow").forEach(b=>
+      b.setAttribute("aria-pressed", picked.has(b.dataset.mv) ? "true" : "false"));
+    const ok = document.getElementById("ok");
+    ok.disabled = !picked.size;
+    ok.textContent = picked.size ? "Log "+fmtQty(picked.size, c.unit) : "Log it";
+  }
+  sheet.querySelectorAll(".pickrow").forEach(b=> b.onclick=()=>{
+    picked.has(b.dataset.mv) ? picked.delete(b.dataset.mv) : picked.add(b.dataset.mv);
+    paint();
+  });
+  paint();
+  document.getElementById("cancel").onclick=closeSheet;
+  document.getElementById("ok").onclick=()=>{
+    const date=document.getElementById("d").value, time=document.getElementById("t").value;
+    if(!date||!time||!picked.size) return;
+    /* catalog order, not tap order, so two identical sessions read identically */
+    const sel = MOBILITY.filter(m=>picked.has(m.id)).map(m=>m.id);
+    const names = sel.map(id=>MOBILITY_BY[id].k).join(" · ");
+    const userNote = document.getElementById("n").value.trim();
+    state.entries.push({uid:"u"+Date.now()+Math.random().toString(36).slice(2,6),
+      date, time, id:"mobility", q:sel.length, sel,
+      note:(userNote?userNote+" — ":"")+names});
+    save(); closeSheet(); renderAll();
+    toast(c.em+" "+fmtQty(sel.length, c.unit)+" logged"+
+      (dayMeta(date).dots.green ? " · REHAB dot earned" : ""));
     celebrateIfStar(date);
   };
 }
