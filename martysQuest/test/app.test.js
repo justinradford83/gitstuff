@@ -335,6 +335,45 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
     check(errs.length===0, `crab rename page errors: ${[...new Set(errs)].join(' | ')}`);
     await ctx.close();
   }
+  { /* the afternoon stack: 3 lamotrigine, so 125 mg across the two stacks */
+    const {ctx, page, errs} = await open(browser);
+    for(const st of ['morn','aft']){
+      await page.evaluate(id=>document.querySelector(`[data-stack="${id}"]`).click(), st);
+      await page.waitForTimeout(220);
+      await page.click('#sheet #ok'); await page.waitForTimeout(300);
+    }
+    const tabs = await page.evaluate(()=>state.entries.filter(e=>e.date===todayISO() && e.id==='lamo').map(e=>e.q));
+    check(JSON.stringify(tabs.slice().sort())==='[2,3]', `the two stacks logged lamotrigine ${JSON.stringify(tabs)}`);
+    check(tabs.reduce((a,q)=>a+q,0)*25===125, 'the daily lamotrigine total is not 125 mg');
+    check(errs.length===0, `afternoon stack page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
+  { /* breath hold card counts the holds in the window, like the strength card */
+    const {ctx, page, errs} = await open(browser);
+    await page.evaluate(()=>{ const t=todayISO();
+      [[0,60],[0,75],[2,80],[10,90],[40,100]].forEach(([d,sec],i)=>
+        state.entries.push({uid:'bc'+i, date:addDays(t,-d), time:'08:00', id:'breathhold', q:sec}));
+      state.settings.bhRange = 7; save(); renderAll(); });
+    await page.click('nav.tabs button[data-tab="dash"]');
+    await page.waitForTimeout(350);
+    const card = () => page.evaluate(()=>{
+      const c=[...document.querySelectorAll('.mcard')].find(x=>x.querySelector('h3').textContent==='Breath hold');
+      return Object.fromEntries([...c.querySelectorAll('.mstat')].map(m=>
+        [m.querySelector('span').textContent, m.querySelector('b').textContent.replace(/\s+/g,' ').trim()]));
+    });
+    let st = await card();
+    check(st['Holds']==='3 total' && st['Days held']==='2 / 7', `week: ${JSON.stringify(st)}`);
+    await page.evaluate(()=>document.querySelector('[data-bh="30"]').click());
+    await page.waitForTimeout(250);
+    st = await card();
+    check(st['Holds']==='4 total' && st['Days held']==='3 / 30', `month: ${JSON.stringify(st)}`);
+    await page.evaluate(()=>document.querySelector('[data-bh="90"]').click());
+    await page.waitForTimeout(250);
+    st = await card();
+    check(st['Holds']==='5 total' && st['Days held']==='4 / 90', `90 days: ${JSON.stringify(st)}`);
+    check(errs.length===0, `breath card page errors: ${[...new Set(errs)].join(' | ')}`);
+    await ctx.close();
+  }
   { /* the morning stack hands over the right dose — a wrong number here is a
        wrong number of tablets, so the row it writes is checked, not the list */
     const {ctx, page, errs} = await open(browser);
@@ -542,7 +581,8 @@ const seed = page => page.evaluate(()=>{ const t=todayISO();
       bars:c.querySelectorAll('svg rect[rx]').length })));
     check(cards.length===2, `expected 2 metric cards, got ${cards.length}`);
     for(const c of cards){
-      check(c.stats===2, `${c.title} card has ${c.stats} headline stats`);
+      const want = {'Breath hold':4, 'Strength':2}[c.title];
+      check(c.stats===want, `${c.title} card has ${c.stats} headline stats, expected ${want}`);
       check(c.bars>0,   `${c.title} card drew no bars`);
     }
     /* each range switch changes the window and is remembered */
